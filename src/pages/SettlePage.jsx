@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, simplifyDebts } from '../utils/storage';
-import { shortAddress, sendETH } from '../utils/wallet';
+import { getGroup, simplifyDebts, addTransaction } from '../utils/storage';
+import { shortAddress, sendCrypto } from '../utils/wallet';
 
 export default function SettlePage() {
   const { id } = useParams();
@@ -28,12 +28,22 @@ export default function SettlePage() {
     return m?.nickname || shortAddress(addr);
   };
 
-  const handleSendETH = async (debt) => {
+  const handleSend = async (debt) => {
     try {
       setSending(debt.from + debt.to);
       setTxHash(null);
-      const hash = await sendETH(debt.to, debt.amount.toString());
+      const hash = await sendCrypto(debt.currency, debt.to, debt.amount.toString());
       setTxHash(hash);
+      // 记录交易
+      addTransaction({
+        from: debt.from,
+        to: debt.to,
+        amount: debt.amount,
+        currency: debt.currency,
+        txHash: hash,
+        groupId: id,
+        groupName: group?.name || '',
+      });
     } catch (err) {
       alert(err.message);
     } finally {
@@ -86,14 +96,14 @@ export default function SettlePage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-primary">{debt.amount} ETH</p>
+                      <p className="font-bold text-primary">{debt.amount} {debt.currency}</p>
                       {isYouPaying && (
                         <button
                           className="btn btn-primary btn-xs mt-1"
                           disabled={sending === debt.from + debt.to}
-                          onClick={() => handleSendETH(debt)}
+                          onClick={() => handleSend(debt)}
                         >
-                          {sending === debt.from + debt.to ? '...' : t('settle_send_eth')}
+                          {sending === debt.from + debt.to ? '...' : `${t('settle_pay')} ${debt.currency}`}
                         </button>
                       )}
                     </div>

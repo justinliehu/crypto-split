@@ -74,6 +74,41 @@ export default {
   settle_tx_sent: '交易已发送！',
   settle_tx_hash: '交易哈希',
 
+  // 交易记录
+  history_title: '交易记录',
+  history_empty: '暂无交易记录',
+  history_all: '全部',
+  history_sent: '发出',
+  history_received: '收到',
+  history_sent_badge: '发出',
+  history_received_badge: '收到',
+
+  // 邀请
+  invite_title: '邀请加入',
+  invite_copy: '复制链接',
+  invite_share: '分享',
+  invite_copied: '链接已复制！',
+  invite_join: '加入群组',
+  invite_text: '邀请你加入 CryptoSplit 群组「{name}」',
+
+  // 加入群组
+  join_title: '加入群组',
+  join_not_found: '群组不存在或链接已失效',
+  join_already_in: '你已经在这个群组中了',
+  join_go_to_group: '进入群组',
+  join_success: '成功加入！',
+  join_nickname_placeholder: '输入你的昵称（可选）',
+  join_confirm: '确认加入',
+
+  // 通知
+  notif_title: '待收款提醒',
+  notif_empty: '暂无待收款',
+  notif_owes_you: '欠你',
+
+  // 云同步
+  sync_title: '云同步',
+  sync_error: '同步失败，请稍后重试',
+
   // 隐私/条款
   privacy_title: '隐私政策',
   terms_title: '服务条款',

@@ -185,3 +185,163 @@ export async function sendETH(toAddress, amountEth) {
 
   return tx.hash;
 }
+
+/**
+ * 发送 SOL 转账（通过 Phantom / Solflare）
+ * @param {string} toAddress 收款地址（Solana base58 公钥）
+ * @param {string} amountSol SOL 数量（字符串）
+ * @returns {Promise<string>} 交易签名
+ */
+export async function sendSOL(toAddress, amountSol) {
+  const provider = window.phantom?.solana ?? window.solana ?? window.solflare;
+  if (!provider) throw new Error('需要 Solana 钱包（Phantom / Solflare）来发送交易');
+
+  if (!provider.isConnected) await provider.connect();
+
+  const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } =
+    await import('@solana/web3.js');
+
+  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  const fromPubkey = provider.publicKey;
+  const toPubkey = new PublicKey(toAddress);
+  const lamports = Math.round(parseFloat(amountSol) * LAMPORTS_PER_SOL);
+
+  const transaction = new Transaction().add(
+    SystemProgram.transfer({ fromPubkey, toPubkey, lamports })
+  );
+
+  transaction.feePayer = fromPubkey;
+  transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+  const { signature } = await provider.signAndSendTransaction(transaction);
+  return signature;
+}
+
+/**
+ * 发送 SPL Token 转账（用于 SKR 等 Solana 上的代币）
+ * @param {string} toAddress 收款地址
+ * @param {string} amount 数量（字符串）
+ * @param {string} mintAddress 代币 mint 地址
+ * @param {number} decimals 代币精度
+ * @returns {Promise<string>} 交易签名
+ */
+export async function sendSPLToken(toAddress, amount, mintAddress, decimals) {
+  const provider = window.phantom?.solana ?? window.solana ?? window.solflare;
+  if (!provider) throw new Error('需要 Solana 钱包来发送代币');
+
+  if (!provider.isConnected) await provider.connect();
+
+  const { Connection, PublicKey, Transaction } = await import('@solana/web3.js');
+  const {
+    getAssociatedTokenAddress,
+    createTransferInstruction,
+    createAssociatedTokenAccountInstruction,
+    getAccount,
+  } = await import('@solana/spl-token');
+
+  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  const fromPubkey = provider.publicKey;
+  const toPubkey = new PublicKey(toAddress);
+  const mint = new PublicKey(mintAddress);
+
+  const fromATA = await getAssociatedTokenAddress(mint, fromPubkey);
+  const toATA = await getAssociatedTokenAddress(mint, toPubkey);
+
+  const transaction = new Transaction();
+
+  // 如果收款方还没有该代币账户，先创建
+  try {
+    await getAccount(connection, toATA);
+  } catch {
+    transaction.add(
+      createAssociatedTokenAccountInstruction(fromPubkey, toATA, toPubkey, mint)
+    );
+  }
+
+  const rawAmount = BigInt(Math.round(parseFloat(amount) * 10 ** decimals));
+  transaction.add(
+    createTransferInstruction(fromATA, toATA, fromPubkey, rawAmount)
+  );
+
+  transaction.feePayer = fromPubkey;
+  transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+  const { signature } = await provider.signAndSendTransaction(transaction);
+  return signature;
+}
+
+// ─── SKR (Seeker Token) 配置 ─────────────────────────────────────────────────
+// TODO: 替换为 SKR 正式的 mint 地址和精度
+export const SKR_MINT = 'SKRtBrVfGE3JwCrBaKBahGHLhRGyNb5G1xQNjduJkwb';
+export const SKR_DECIMALS = 9;
+
+/**
+ * 发送 SKR 代币
+ */
+export async function sendSKR(toAddress, amount) {
+  return sendSPLToken(toAddress, amount, SKR_MINT, SKR_DECIMALS);
+}
+
+// ─── ERC-20 代币支持 ──────────────────────────────────────────────────────────
+
+// 主网合约地址
+const ERC20_TOKENS = {
+  USDT: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6 },
+  USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6 },
+};
+
+const ERC20_ABI = [
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
+
+/**
+ * 发送 ERC-20 代币
+ * @param {string} toAddress 收款地址
+ * @param {string} amount 数量（人类可读，如 "10.5"）
+ * @param {string} tokenSymbol 代币符号 (USDT/USDC)
+ * @returns {Promise<string>} 交易哈希
+ */
+export async function sendERC20(toAddress, amount, tokenSymbol) {
+  const { ethers } = await import('ethers');
+
+  if (!window.ethereum) throw new Error('需要 EVM 钱包来发送代币');
+
+  const tokenInfo = ERC20_TOKENS[tokenSymbol];
+  if (!tokenInfo) throw new Error(`未知 ERC-20 代币: ${tokenSymbol}`);
+
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  const contract = new ethers.Contract(tokenInfo.address, ERC20_ABI, signer);
+
+  const rawAmount = ethers.parseUnits(amount, tokenInfo.decimals);
+  const tx = await contract.transfer(toAddress, rawAmount);
+
+  return tx.hash;
+}
+
+/**
+ * 根据币种发送对应的加密货币
+ * @param {string} currency 币种 (ETH/SOL/SKR/USDT/USDC/...)
+ * @param {string} toAddress 收款地址
+ * @param {string} amount 数量
+ * @returns {Promise<string>} 交易哈希/签名
+ */
+export async function sendCrypto(currency, toAddress, amount) {
+  switch (currency) {
+    case 'ETH':
+    case 'MATIC':
+    case 'BNB':
+      return sendETH(toAddress, amount);
+    case 'SOL':
+      return sendSOL(toAddress, amount);
+    case 'SKR':
+      return sendSKR(toAddress, amount);
+    case 'USDT':
+    case 'USDC':
+      return sendERC20(toAddress, amount, currency);
+    default:
+      throw new Error(`不支持的币种: ${currency}`);
+  }
+}

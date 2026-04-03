@@ -4,6 +4,8 @@ import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import WalletPicker from './WalletPicker';
+import NotificationBell from './NotificationBell';
+import SyncButton from './SyncButton';
 
 export default function Header() {
   const { address, shortAddr, isConnected, disconnect, availableWallets, connect } = useWallet();
@@ -28,15 +30,27 @@ export default function Header() {
             CryptoSplit
           </Link>
         </div>
-        <div className="flex-none gap-2">
+        <div className="flex-none gap-1">
           {installable && (
             <button className="btn btn-sm btn-outline" onClick={promptInstall}>
               {t('install_app')}
             </button>
           )}
 
+          {isConnected && (
+            <>
+              <SyncButton />
+              <NotificationBell />
+              <Link to="/history" className="btn btn-ghost btn-sm btn-circle" title={t('history_title')}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </Link>
+            </>
+          )}
+
           <select
-            className="select select-sm select-bordered"
+            className="select select-sm select-bordered w-20"
             value={locale}
             onChange={(e) => setLocale(e.target.value)}
           >

@@ -35,6 +35,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
+          cloudbase: ['@cloudbase/js-sdk'],
+          solana: ['@solana/web3.js'],
         },
       },
     },

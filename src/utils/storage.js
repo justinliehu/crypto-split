@@ -4,6 +4,7 @@
 
 const GROUPS_KEY = 'cryptosplit_groups';
 const EXPENSES_KEY = 'cryptosplit_expenses';
+const TX_KEY = 'cryptosplit_transactions';
 
 function read(key) {
   try {
@@ -84,20 +85,22 @@ export function deleteExpense(id) {
   write(EXPENSES_KEY, read(EXPENSES_KEY).filter((e) => e.id !== id));
 }
 
-// ─── 余额计算 ─────────────────────────────────────────────────────────────────
+// ─── 余额计算（按币种分别计算） ──────────────────────────────────────────────
 
 /**
- * 计算群组内每对成员之间的净余额
- * 返回 Map<string, number>  key = "fromAddr->toAddr", value = 净欠款（正数表示 from 欠 to）
+ * 计算群组内每个成员的净余额（按币种）
+ * 返回 { currency: { address: netAmount } }
  */
 export function calculateBalances(groupId) {
   const expenses = getExpenses(groupId);
-  // 先算每对之间的净值
-  const net = {}; // { address: netAmount }  正=被欠钱(别人欠你)，负=欠别人
+  const byCurrency = {}; // { ETH: { addr: net }, SOL: { addr: net }, ... }
 
   for (const exp of expenses) {
+    const cur = exp.currency || 'ETH';
+    if (!byCurrency[cur]) byCurrency[cur] = {};
+    const net = byCurrency[cur];
+
     const share = parseFloat(exp.amount) / exp.splitAmong.length;
-    // 付款人被所有分摊人欠
     for (const addr of exp.splitAmong) {
       if (addr === exp.paidBy) continue;
       net[exp.paidBy] = (net[exp.paidBy] || 0) + share;
@@ -105,45 +108,136 @@ export function calculateBalances(groupId) {
     }
   }
 
-  return net;
+  return byCurrency;
 }
 
 /**
- * 简化债务：最少转账次数
- * 返回 [{from, to, amount}]
+ * 简化债务：每种币种分别最少转账次数
+ * 返回 [{from, to, amount, currency}]
  */
 export function simplifyDebts(groupId) {
-  const net = calculateBalances(groupId);
+  const byCurrency = calculateBalances(groupId);
+  const allSettlements = [];
 
-  const creditors = []; // 被欠钱的人
-  const debtors = [];   // 欠钱的人
+  for (const [currency, net] of Object.entries(byCurrency)) {
+    const creditors = [];
+    const debtors = [];
 
-  for (const [addr, amount] of Object.entries(net)) {
-    if (amount > 0.000001) creditors.push({ addr, amount });
-    else if (amount < -0.000001) debtors.push({ addr, amount: -amount });
+    for (const [addr, amount] of Object.entries(net)) {
+      if (amount > 0.000001) creditors.push({ addr, amount });
+      else if (amount < -0.000001) debtors.push({ addr, amount: -amount });
+    }
+
+    creditors.sort((a, b) => b.amount - a.amount);
+    debtors.sort((a, b) => b.amount - a.amount);
+
+    let i = 0, j = 0;
+    while (i < creditors.length && j < debtors.length) {
+      const settle = Math.min(creditors[i].amount, debtors[j].amount);
+      if (settle > 0.000001) {
+        allSettlements.push({
+          from: debtors[j].addr,
+          to: creditors[i].addr,
+          amount: parseFloat(settle.toFixed(8)),
+          currency,
+        });
+      }
+      creditors[i].amount -= settle;
+      debtors[j].amount -= settle;
+      if (creditors[i].amount < 0.000001) i++;
+      if (debtors[j].amount < 0.000001) j++;
+    }
   }
 
-  // 从大到小排序
-  creditors.sort((a, b) => b.amount - a.amount);
-  debtors.sort((a, b) => b.amount - a.amount);
+  return allSettlements;
+}
 
-  const settlements = [];
-  let i = 0, j = 0;
+// ─── 交易记录 ─────────────────────────────────────────────────────────────────
 
-  while (i < creditors.length && j < debtors.length) {
-    const settle = Math.min(creditors[i].amount, debtors[j].amount);
-    if (settle > 0.000001) {
-      settlements.push({
-        from: debtors[j].addr,
-        to: creditors[i].addr,
-        amount: parseFloat(settle.toFixed(8)),
+export function getTransactions() {
+  return read(TX_KEY);
+}
+
+export function addTransaction({ from, to, amount, currency, txHash, groupId, groupName }) {
+  const transactions = read(TX_KEY);
+  const tx = {
+    id: crypto.randomUUID(),
+    from,
+    to,
+    amount,
+    currency,
+    txHash,
+    groupId,
+    groupName,
+    timestamp: Date.now(),
+  };
+  transactions.push(tx);
+  write(TX_KEY, transactions);
+  return tx;
+}
+
+// ─── 通知：谁欠你钱 ──────────────────────────────────────────────────────────
+
+/**
+ * 获取所有群组中别人欠你的债务
+ * 返回 [{ groupId, groupName, debts: [{from, amount, currency}] }]
+ */
+export function getDebtsOwedToYou(walletAddress) {
+  const addr = walletAddress.toLowerCase();
+  const groups = getGroups();
+  const result = [];
+
+  for (const group of groups) {
+    if (!group.members.some((m) => m.address.toLowerCase() === addr)) continue;
+
+    const debts = simplifyDebts(group.id);
+    const owedToYou = debts.filter((d) => d.to.toLowerCase() === addr);
+
+    if (owedToYou.length > 0) {
+      result.push({
+        groupId: group.id,
+        groupName: group.name,
+        debts: owedToYou,
       });
     }
-    creditors[i].amount -= settle;
-    debtors[j].amount -= settle;
-    if (creditors[i].amount < 0.000001) i++;
-    if (debtors[j].amount < 0.000001) j++;
   }
 
-  return settlements;
+  return result;
+}
+
+// ─── 云端数据合并 ─────────────────────────────────────────────────────────────
+
+/**
+ * 将云端数据合并到本地（以 ID 去重，保留两端数据）
+ */
+export function mergeCloudData({ groups: cloudGroups, expenses: cloudExpenses, transactions: cloudTx }) {
+  // 合并群组
+  const localGroups = getGroups();
+  const groupIds = new Set(localGroups.map((g) => g.id));
+  for (const cg of cloudGroups) {
+    if (!groupIds.has(cg.id)) {
+      localGroups.push(cg);
+    }
+  }
+  write(GROUPS_KEY, localGroups);
+
+  // 合并账单
+  const localExpenses = read(EXPENSES_KEY);
+  const expIds = new Set(localExpenses.map((e) => e.id));
+  for (const ce of cloudExpenses) {
+    if (!expIds.has(ce.id)) {
+      localExpenses.push(ce);
+    }
+  }
+  write(EXPENSES_KEY, localExpenses);
+
+  // 合并交易记录
+  const localTx = read(TX_KEY);
+  const txIds = new Set(localTx.map((t) => t.id));
+  for (const ct of cloudTx) {
+    if (!txIds.has(ct.id)) {
+      localTx.push(ct);
+    }
+  }
+  write(TX_KEY, localTx);
 }

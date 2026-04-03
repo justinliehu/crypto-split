@@ -67,6 +67,41 @@ export default {
   settle_tx_sent: 'Transaction sent!',
   settle_tx_hash: 'TX Hash',
 
+  // Transaction history
+  history_title: 'Transaction History',
+  history_empty: 'No transactions yet',
+  history_all: 'All',
+  history_sent: 'Sent',
+  history_received: 'Received',
+  history_sent_badge: 'Sent',
+  history_received_badge: 'Received',
+
+  // Invite
+  invite_title: 'Invite',
+  invite_copy: 'Copy Link',
+  invite_share: 'Share',
+  invite_copied: 'Link copied!',
+  invite_join: 'Join Group',
+  invite_text: 'Join my CryptoSplit group "{name}"',
+
+  // Join group
+  join_title: 'Join Group',
+  join_not_found: 'Group not found or link expired',
+  join_already_in: 'You are already in this group',
+  join_go_to_group: 'Go to Group',
+  join_success: 'Successfully joined!',
+  join_nickname_placeholder: 'Enter your nickname (optional)',
+  join_confirm: 'Join',
+
+  // Notifications
+  notif_title: 'Pending Payments',
+  notif_empty: 'No pending payments',
+  notif_owes_you: 'owes you',
+
+  // Cloud sync
+  sync_title: 'Cloud Sync',
+  sync_error: 'Sync failed, please try again later',
+
   privacy_title: 'Privacy Policy',
   terms_title: 'Terms of Service',
 

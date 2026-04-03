@@ -5,6 +5,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
 import { getGroup, getExpenses, deleteExpense, calculateBalances } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
+import QRInvite from '../components/QRInvite';
 
 export default function GroupDetailPage() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function GroupDetailPage() {
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState({});
+  const [showInvite, setShowInvite] = useState(false);
 
   const reload = () => {
     const g = getGroup(id);
@@ -45,7 +47,19 @@ export default function GroupDetailPage() {
         <button className="btn btn-ghost btn-sm" onClick={() => nav('/groups')}>&larr; {t('back')}</button>
       </div>
 
-      <h2 className="text-2xl font-bold mb-1">{group.name}</h2>
+      <div className="flex items-start justify-between mb-1">
+        <h2 className="text-2xl font-bold">{group.name}</h2>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setShowInvite(true)}
+          title={t('invite_title')}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          {t('invite_title')}
+        </button>
+      </div>
       <p className="text-sm text-base-content/60 mb-6">
         {group.members.map((m) => m.nickname || shortAddress(m.address)).join(', ')}
       </p>
@@ -57,21 +71,25 @@ export default function GroupDetailPage() {
           {Object.keys(balances).length === 0 ? (
             <p className="text-base-content/50">{t('balances_settled')}</p>
           ) : (
-            <div className="flex flex-col gap-1">
-              {Object.entries(balances).map(([addr, amount]) => {
-                const isYou = addr.toLowerCase() === address?.toLowerCase();
-                const display = memberName(addr);
-                return (
-                  <div key={addr} className="flex justify-between text-sm">
-                    <span className={isYou ? 'font-bold' : ''}>
-                      {display} {isYou ? t('group_you') : ''}
-                    </span>
-                    <span className={amount >= 0 ? 'text-success' : 'text-error'}>
-                      {amount >= 0 ? '+' : ''}{amount.toFixed(6)} ETH
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="flex flex-col gap-2">
+              {Object.entries(balances).map(([currency, net]) => (
+                <div key={currency}>
+                  <p className="text-xs font-bold text-base-content/40 mb-1">{currency}</p>
+                  {Object.entries(net).map(([addr, amount]) => {
+                    const isYou = addr.toLowerCase() === address?.toLowerCase();
+                    return (
+                      <div key={addr} className="flex justify-between text-sm">
+                        <span className={isYou ? 'font-bold' : ''}>
+                          {memberName(addr)} {isYou ? t('group_you') : ''}
+                        </span>
+                        <span className={amount >= 0 ? 'text-success' : 'text-error'}>
+                          {amount >= 0 ? '+' : ''}{amount.toFixed(6)} {currency}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -129,6 +147,8 @@ export default function GroupDetailPage() {
           ))}
         </div>
       )}
+
+      {showInvite && <QRInvite group={group} onClose={() => setShowInvite(false)} />}
     </div>
   );
 }

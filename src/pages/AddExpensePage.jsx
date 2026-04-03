@@ -90,6 +90,8 @@ export default function AddExpensePage() {
               onChange={(e) => setCurrency(e.target.value)}
             >
               <option value="ETH">ETH</option>
+              <option value="SOL">SOL</option>
+              <option value="SKR">SKR (Seeker)</option>
               <option value="MATIC">MATIC</option>
               <option value="BNB">BNB</option>
               <option value="USDT">USDT</option>

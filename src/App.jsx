@@ -6,6 +6,8 @@ import GroupsPage from './pages/GroupsPage';
 import GroupDetailPage from './pages/GroupDetailPage';
 import AddExpensePage from './pages/AddExpensePage';
 import SettlePage from './pages/SettlePage';
+import HistoryPage from './pages/HistoryPage';
+import JoinGroupPage from './pages/JoinGroupPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 
@@ -21,6 +23,8 @@ export default function App() {
             <Route path="/group/:id" element={<GroupDetailPage />} />
             <Route path="/group/:id/add-expense" element={<AddExpensePage />} />
             <Route path="/group/:id/settle" element={<SettlePage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/join/:id" element={<JoinGroupPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
           </Routes>
