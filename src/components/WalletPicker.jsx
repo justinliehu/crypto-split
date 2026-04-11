@@ -1,10 +1,18 @@
+import { useEffect, useRef } from 'react';
 import { useLocale } from '../contexts/LocaleContext';
 
 export default function WalletPicker({ wallets, onSelect, onClose }) {
   const { t } = useLocale();
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, []);
 
   return (
-    <div className="modal modal-open">
+    <dialog ref={dialogRef} className="modal" onClose={onClose}>
       <div className="modal-box">
         <h3 className="font-bold text-lg mb-4">{t('connect_wallet')}</h3>
         {wallets.length === 0 ? (
@@ -28,7 +36,9 @@ export default function WalletPicker({ wallets, onSelect, onClose }) {
           <button className="btn" onClick={onClose}>{t('cancel')}</button>
         </div>
       </div>
-      <div className="modal-backdrop" onClick={onClose} />
-    </div>
+      <form method="dialog" className="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
   );
 }

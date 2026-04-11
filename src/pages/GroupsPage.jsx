@@ -109,7 +109,9 @@ export default function GroupsPage() {
             <button
               key={w.id}
               className="btn btn-primary btn-outline gap-2"
-              onClick={() => connect(w.id)}
+              onClick={async () => {
+                try { await connect(w.id); } catch (err) { alert(err.message); }
+              }}
             >
               {w.name}
             </button>
