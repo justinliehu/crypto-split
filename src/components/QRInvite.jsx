@@ -1,18 +1,29 @@
+import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLocale } from '../contexts/LocaleContext';
 
 export default function QRInvite({ group, onClose }) {
   const { t } = useLocale();
+  const [ready, setReady] = useState(false);
 
-  // 将群组核心信息编码到 URL，朋友打开后自动创建群组
-  const payload = btoa(encodeURIComponent(JSON.stringify({
-    id: group.id,
-    name: group.name,
-    members: group.members,
-    createdBy: group.createdBy,
-    createdAt: group.createdAt,
-  })));
-  const inviteUrl = `${window.location.origin}${window.location.pathname}#/join/${group.id}?data=${payload}`;
+  const inviteUrl = `${window.location.origin}${window.location.pathname}#/join/${group.id}`;
+
+  // Upload group data to server so the join link works cross-device
+  useEffect(() => {
+    fetch(`${window.location.origin}/api/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: group.id,
+        name: group.name,
+        members: group.members,
+        createdBy: group.createdBy,
+        createdAt: group.createdAt,
+      }),
+    })
+      .then(() => setReady(true))
+      .catch(() => setReady(true)); // still show QR even if upload fails
+  }, [group]);
 
   const copyLink = async () => {
     try {
@@ -52,7 +63,7 @@ export default function QRInvite({ group, onClose }) {
 
         <div className="flex justify-center mb-4">
           <div className="bg-white p-4 rounded-xl">
-            <QRCodeSVG value={inviteUrl} size={200} level="H" />
+            <QRCodeSVG value={inviteUrl} size={200} level="M" />
           </div>
         </div>
 

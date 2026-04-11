@@ -1,31 +1,16 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, getGroups, updateGroup } from '../utils/storage';
+import { getGroup, updateGroup } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
 
-function parseInviteData(search) {
-  try {
-    const params = new URLSearchParams(search);
-    const raw = params.get('data');
-    if (!raw) return null;
-    return JSON.parse(decodeURIComponent(atob(raw)));
-  } catch {
-    return null;
-  }
-}
-
-function importGroupFromUrl(id, search) {
-  const data = parseInviteData(search);
-  if (!data || data.id !== id) return null;
-
-  // Save directly to localStorage with the original ID
+function saveGroupToLocal(data) {
   const groups = JSON.parse(localStorage.getItem('cryptosplit_groups') || '[]');
-  if (groups.some((g) => g.id === id)) return getGroup(id); // already exists
+  if (groups.some((g) => g.id === data.id)) return getGroup(data.id);
 
   const group = {
-    id,
+    id: data.id,
     name: data.name,
     members: data.members || [],
     createdBy: data.createdBy || '',
@@ -38,7 +23,6 @@ function importGroupFromUrl(id, search) {
 
 export default function JoinGroupPage() {
   const { id } = useParams();
-  const location = useLocation();
   const nav = useNavigate();
   const { address, isConnected } = useWallet();
   const { t } = useLocale();
@@ -47,21 +31,41 @@ export default function JoinGroupPage() {
   const [status, setStatus] = useState('loading');
 
   useEffect(() => {
-    let g = getGroup(id);
-    if (!g) g = importGroupFromUrl(id, location.search);
+    let cancelled = false;
 
-    if (!g) {
-      setStatus('not_found');
-      return;
-    }
-    setGroup(g);
+    async function load() {
+      // 1. Check local storage first
+      let g = getGroup(id);
 
-    if (address && g.members.some((m) => m.address?.toLowerCase() === address.toLowerCase())) {
-      setStatus('already_in');
-    } else {
-      setStatus('ready');
+      // 2. If not local, fetch from server invite API
+      if (!g) {
+        try {
+          const res = await fetch(`${window.location.origin}/api/invite/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            g = saveGroupToLocal(data);
+          }
+        } catch (_) {}
+      }
+
+      if (cancelled) return;
+
+      if (!g) {
+        setStatus('not_found');
+        return;
+      }
+      setGroup(g);
+
+      if (address && g.members.some((m) => m.address?.toLowerCase() === address.toLowerCase())) {
+        setStatus('already_in');
+      } else {
+        setStatus('ready');
+      }
     }
-  }, [id, address, location.search]);
+
+    load();
+    return () => { cancelled = true; };
+  }, [id, address]);
 
   const handleJoin = () => {
     if (!address || !group) return;
