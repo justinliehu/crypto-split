@@ -1,9 +1,26 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
 import { getGroup, updateGroup } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
+
+// Decode compact format: id|name|createdBy|addr1:nick1,addr2:nick2
+function decodeInvite(encoded) {
+  try {
+    const payload = decodeURIComponent(escape(atob(encoded)));
+    const [id, name, createdBy, membersStr] = payload.split('|');
+    const members = membersStr
+      ? membersStr.split(',').map((m) => {
+          const [address, nickname] = m.split(':');
+          return { address: address || '', nickname: nickname || '' };
+        })
+      : [];
+    return { id, name, members, createdBy, createdAt: Date.now() };
+  } catch {
+    return null;
+  }
+}
 
 function saveGroupToLocal(data) {
   const groups = JSON.parse(localStorage.getItem('cryptosplit_groups') || '[]');
@@ -23,6 +40,7 @@ function saveGroupToLocal(data) {
 
 export default function JoinGroupPage() {
   const { id } = useParams();
+  const location = useLocation();
   const nav = useNavigate();
   const { address, isConnected } = useWallet();
   const { t } = useLocale();
@@ -37,7 +55,19 @@ export default function JoinGroupPage() {
       // 1. Check local storage first
       let g = getGroup(id);
 
-      // 2. If not local, fetch from server invite API
+      // 2. Try URL ?d= param (compact encoded data from QR)
+      if (!g) {
+        const params = new URLSearchParams(location.search);
+        const d = params.get('d');
+        if (d) {
+          const data = decodeInvite(d);
+          if (data && data.id === id) {
+            g = saveGroupToLocal(data);
+          }
+        }
+      }
+
+      // 3. Try server invite API
       if (!g) {
         try {
           const res = await fetch(`${window.location.origin}/api/invite/${id}`);
@@ -65,7 +95,7 @@ export default function JoinGroupPage() {
 
     load();
     return () => { cancelled = true; };
-  }, [id, address]);
+  }, [id, address, location.search]);
 
   const handleJoin = () => {
     if (!address || !group) return;

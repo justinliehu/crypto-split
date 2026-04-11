@@ -2,13 +2,23 @@ import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLocale } from '../contexts/LocaleContext';
 
+// Compact encode: id|name|createdBy|addr1:nick1,addr2:nick2
+function encodeInvite(group) {
+  const members = group.members
+    .map((m) => `${m.address || ''}:${m.nickname || ''}`)
+    .join(',');
+  const payload = [group.id, group.name, group.createdBy || '', members].join('|');
+  return btoa(unescape(encodeURIComponent(payload)));
+}
+
 export default function QRInvite({ group, onClose }) {
   const { t } = useLocale();
-  const [ready, setReady] = useState(false);
 
-  const inviteUrl = `${window.location.origin}${window.location.pathname}#/join/${group.id}`;
+  const base = `${window.location.origin}${window.location.pathname}#/join/${group.id}`;
+  const encoded = encodeInvite(group);
+  const inviteUrl = `${base}?d=${encoded}`;
 
-  // Upload group data to server so the join link works cross-device
+  // Also upload to server as backup (cross-device without QR)
   useEffect(() => {
     fetch(`${window.location.origin}/api/invite`, {
       method: 'POST',
@@ -20,9 +30,7 @@ export default function QRInvite({ group, onClose }) {
         createdBy: group.createdBy,
         createdAt: group.createdAt,
       }),
-    })
-      .then(() => setReady(true))
-      .catch(() => setReady(true)); // still show QR even if upload fails
+    }).catch(() => {});
   }, [group]);
 
   const copyLink = async () => {
@@ -63,11 +71,11 @@ export default function QRInvite({ group, onClose }) {
 
         <div className="flex justify-center mb-4">
           <div className="bg-white p-4 rounded-xl">
-            <QRCodeSVG value={inviteUrl} size={200} level="M" />
+            <QRCodeSVG value={inviteUrl} size={260} level="L" />
           </div>
         </div>
 
-        <p className="text-xs text-base-content/40 font-mono break-all mb-4">{inviteUrl}</p>
+        <p className="text-xs text-base-content/40 font-mono break-all mb-4">{base}</p>
 
         <div className="flex gap-2 justify-center">
           <button className="btn btn-primary btn-sm" onClick={copyLink}>

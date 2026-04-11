@@ -1,11 +1,12 @@
 import { createServer } from 'http';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
+const INVITES_DIR = join(__dirname, 'data', 'invites');
 const PORT = process.env.PORT || 8000;
 
 const MIME = {
@@ -21,15 +22,38 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
 };
 
-// In-memory invite store (groupId -> group data), auto-expire after 24h
-const invites = new Map();
+// File-based invite store, auto-expire after 24h
+mkdirSync(INVITES_DIR, { recursive: true });
 const INVITE_TTL = 24 * 60 * 60 * 1000;
 
+function saveInvite(id, data) {
+  const filePath = join(INVITES_DIR, `${id}.json`);
+  writeFileSync(filePath, JSON.stringify({ ...data, _createdAt: Date.now() }));
+}
+
+function loadInvite(id) {
+  const filePath = join(INVITES_DIR, `${id}.json`);
+  if (!existsSync(filePath)) return null;
+  try {
+    const inv = JSON.parse(readFileSync(filePath, 'utf8'));
+    if (Date.now() - inv._createdAt > INVITE_TTL) {
+      unlinkSync(filePath);
+      return null;
+    }
+    return inv;
+  } catch { return null; }
+}
+
 function cleanExpiredInvites() {
-  const now = Date.now();
-  for (const [id, inv] of invites) {
-    if (now - inv._createdAt > INVITE_TTL) invites.delete(id);
-  }
+  try {
+    for (const file of readdirSync(INVITES_DIR)) {
+      const filePath = join(INVITES_DIR, file);
+      try {
+        const inv = JSON.parse(readFileSync(filePath, 'utf8'));
+        if (Date.now() - inv._createdAt > INVITE_TTL) unlinkSync(filePath);
+      } catch { unlinkSync(filePath); }
+    }
+  } catch {}
 }
 setInterval(cleanExpiredInvites, 60 * 60 * 1000);
 
@@ -61,7 +85,7 @@ createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'missing id' }));
       return;
     }
-    invites.set(data.id, { ...data, _createdAt: Date.now() });
+    saveInvite(data.id, data);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
     return;
@@ -70,7 +94,7 @@ createServer(async (req, res) => {
   // --- API: get invite ---
   if (rawPath.startsWith('/api/invite/') && req.method === 'GET') {
     const id = rawPath.slice('/api/invite/'.length);
-    const inv = invites.get(id);
+    const inv = loadInvite(id);
     if (!inv) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'not found' }));
