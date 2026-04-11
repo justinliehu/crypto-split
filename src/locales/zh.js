@@ -123,6 +123,13 @@ export default {
   notif_empty: '暂无待收款',
   notif_owes_you: '欠你',
 
+  // 扫码
+  scan_title: '扫一扫',
+  scan_no_detector: '你的浏览器不支持扫码，请粘贴邀请链接',
+  scan_paste_link: '粘贴邀请链接',
+  scan_paste_placeholder: '在此粘贴邀请链接...',
+  scan_invalid: '无效的二维码',
+
   // 云同步
   sync_title: '云同步',
   sync_error: '同步失败，请稍后重试',

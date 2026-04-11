@@ -112,6 +112,12 @@ export default {
   notif_empty: 'No pending payments',
   notif_owes_you: 'owes you',
 
+  scan_title: 'Scan QR',
+  scan_no_detector: 'Your browser does not support QR scanning. Paste the invite link below.',
+  scan_paste_link: 'Paste invite link',
+  scan_paste_placeholder: 'Paste invite link here...',
+  scan_invalid: 'Invalid QR code',
+
   sync_title: 'Cloud Sync',
   sync_error: 'Sync failed, please try again later',
 

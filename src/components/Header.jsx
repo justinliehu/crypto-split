@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import WalletPicker from './WalletPicker';
+import QRScanner from './QRScanner';
 import NotificationBell from './NotificationBell';
 import SyncButton from './SyncButton';
 
@@ -12,6 +13,8 @@ export default function Header() {
   const { locale, setLocale, t } = useLocale();
   const { installable, promptInstall } = usePWAInstall();
   const [showPicker, setShowPicker] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const nav = useNavigate();
 
   const handleConnect = async (walletId) => {
     try {
@@ -21,6 +24,27 @@ export default function Header() {
       alert(err.message);
     }
   };
+
+  const handleScanResult = useCallback((value) => {
+    setShowScanner(false);
+    // Extract hash route from scanned URL or pasted link
+    try {
+      const url = new URL(value);
+      const hash = url.hash || '';
+      if (hash.startsWith('#/join/')) {
+        // Navigate including query string (has invite data)
+        const route = hash.slice(1); // remove leading #
+        nav(route);
+        return;
+      }
+    } catch (_) {}
+    // If it's a raw path like /join/xxx
+    if (value.startsWith('/join/')) {
+      nav(value);
+      return;
+    }
+    alert(t('scan_invalid') || 'Invalid QR code');
+  }, [nav, t]);
 
   return (
     <>
@@ -36,6 +60,17 @@ export default function Header() {
               {t('install_app')}
             </button>
           )}
+
+          {/* 扫码按钮 — 始终显示 */}
+          <button
+            className="btn btn-ghost btn-sm btn-circle"
+            title={t('scan_title') || 'Scan QR'}
+            onClick={() => setShowScanner(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+          </button>
 
           {isConnected && (
             <>
@@ -90,6 +125,13 @@ export default function Header() {
           wallets={availableWallets}
           onSelect={handleConnect}
           onClose={() => setShowPicker(false)}
+        />
+      )}
+
+      {showScanner && (
+        <QRScanner
+          onResult={handleScanResult}
+          onClose={() => setShowScanner(false)}
         />
       )}
     </>
