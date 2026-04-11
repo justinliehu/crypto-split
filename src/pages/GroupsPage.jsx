@@ -20,7 +20,7 @@ function Avatar({ name, size = 'w-10 h-10', textSize = 'text-sm' }) {
 }
 
 export default function GroupsPage() {
-  const { address } = useWallet();
+  const { address, isConnected, loading, availableWallets, connect } = useWallet();
   const { t, locale } = useLocale();
   const nav = useNavigate();
   const [groups, setGroups] = useState([]);
@@ -33,6 +33,7 @@ export default function GroupsPage() {
   const [totalOwed, setTotalOwed] = useState(0);
 
   useEffect(() => {
+    if (!address) { setGroups([]); setTotalOwe(0); setTotalOwed(0); return; }
     const allGroups = getGroups().filter((g) =>
       g.createdBy === address || g.members.some((m) => m.address.toLowerCase() === address?.toLowerCase())
     );
@@ -84,6 +85,42 @@ export default function GroupsPage() {
     if (m.address.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
     return m.nickname || shortAddress(m.address);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <span className="loading loading-spinner loading-lg text-primary"></span>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 text-primary/30 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <h2 className="text-2xl font-bold mb-2">{t('home_need_wallet')}</h2>
+        <p className="text-base-content/50 mb-6 max-w-sm">
+          {t('home_subtitle')}
+        </p>
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          {availableWallets.map((w) => (
+            <button
+              key={w.id}
+              className="btn btn-primary btn-outline gap-2"
+              onClick={() => connect(w.id)}
+            >
+              {w.name}
+            </button>
+          ))}
+          {availableWallets.length === 0 && (
+            <p className="text-sm text-base-content/40">{t('connect_wallet')}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
