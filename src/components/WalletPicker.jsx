@@ -1,19 +1,12 @@
-import { useEffect, useRef } from 'react';
 import { useLocale } from '../contexts/LocaleContext';
 
 export default function WalletPicker({ wallets, onSelect, onClose }) {
   const { t } = useLocale();
-  const dialogRef = useRef(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-    return () => { if (dialog?.open) dialog.close(); };
-  }, []);
 
   return (
-    <dialog ref={dialogRef} className="modal" onClose={onClose}>
-      <div className="modal-box">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-base-200 rounded-2xl p-6 mx-4 max-w-sm w-full shadow-xl">
         <h3 className="font-bold text-lg mb-4">{t('connect_wallet')}</h3>
         {wallets.length === 0 ? (
           <p className="text-base-content/60">No wallets detected. Please install MetaMask or another wallet.</p>
@@ -32,13 +25,10 @@ export default function WalletPicker({ wallets, onSelect, onClose }) {
             ))}
           </div>
         )}
-        <div className="modal-action">
+        <div className="flex justify-end mt-4">
           <button className="btn" onClick={onClose}>{t('cancel')}</button>
         </div>
       </div>
-      <form method="dialog" className="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
+    </div>
   );
 }
