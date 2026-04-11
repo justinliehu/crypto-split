@@ -7,7 +7,8 @@
     "dev": "vite",
     "dev:mobile": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server.js"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^2.27.2",
