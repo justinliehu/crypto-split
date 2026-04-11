@@ -18,6 +18,23 @@ function write(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
 }
 
+// ─── 数据迁移：修复旧数据中 nickname 为"（你）"的问题 ──────────────────────────
+(function migrateNicknames() {
+  try {
+    const groups = JSON.parse(localStorage.getItem(GROUPS_KEY)) || [];
+    let changed = false;
+    for (const g of groups) {
+      for (const m of g.members || []) {
+        if (m.nickname === '（你）' || m.nickname === '(you)') {
+          m.nickname = '';
+          changed = true;
+        }
+      }
+    }
+    if (changed) localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
+  } catch {}
+})();
+
 // ─── 群组 ─────────────────────────────────────────────────────────────────────
 
 export function getGroups() {
