@@ -22,12 +22,18 @@ export default {
   home_feature2_title: 'Smart Splitting',
   home_feature2_desc: 'Auto-calculate optimal repayment paths',
   home_feature3_title: 'On-chain Settlement',
-  home_feature3_desc: 'One-click ETH transfer to settle debts',
+  home_feature3_desc: 'One-click ETH / SOL / SKR transfer to settle debts',
   home_need_wallet: 'Please connect your wallet first',
 
+  // Dashboard
+  dashboard_total_balance: 'Net Balance',
+  dashboard_you_owe: 'You owe',
+  dashboard_owed_to_you: 'Owed to you',
+
   groups_title: 'My Groups',
-  groups_empty: 'No groups yet. Create one!',
-  groups_create: 'Create Group',
+  groups_empty: 'No groups yet',
+  groups_empty_hint: 'Tap the button above to create your first group',
+  groups_create: 'New Group',
   group_name: 'Group Name',
   group_name_placeholder: 'e.g. Weekend Dinner',
   group_members: 'Members',
@@ -35,31 +41,43 @@ export default {
   group_member_address: 'Wallet Address',
   group_member_nickname: 'Nickname (optional)',
   group_you: '(you)',
+  group_you_label: 'You',
   group_delete_confirm: 'Delete this group and all its expenses?',
+
+  // Summary
+  summary_total: 'Total',
+  summary_you_paid: 'You paid',
+  summary_your_share: 'Your share',
 
   expenses_title: 'Expenses',
   expenses_empty: 'No expenses yet',
+  expenses_empty_hint: 'Add your first expense to start splitting',
   expense_add: 'Add Expense',
   expense_desc: 'Description',
-  expense_desc_placeholder: 'e.g. Dinner',
+  expense_desc_placeholder: 'e.g. Dinner, Taxi, Tickets',
   expense_amount: 'Amount',
   expense_amount_placeholder: '0.05',
   expense_currency: 'Currency',
   expense_paid_by: 'Paid by',
+  expense_paid_label: 'paid',
   expense_split_among: 'Split among',
   expense_select_all: 'Select All',
   expense_delete_confirm: 'Delete this expense?',
+  expense_you_lent: 'you lent',
+  expense_you_borrowed: 'you owe',
+  expense_not_involved: 'not involved',
 
-  balances_title: 'Balance Overview',
+  balances_title: 'Balances',
   balances_you_owe: 'You owe',
   balances_owes_you: 'owes you',
   balances_settled: 'All settled!',
   balances_net: 'Net balance',
 
-  settle_title: 'Smart Settlement',
-  settle_desc: 'Simplified repayment plan',
+  settle_title: 'Settle Up',
+  settle_desc: 'Simplified repayment plan with fewest transfers',
   settle_empty: 'All debts are settled!',
   settle_pay: 'Pay',
+  settle_owes: 'owes',
   settle_from: 'From',
   settle_to: 'To',
   settle_amount: 'Amount',
@@ -67,7 +85,6 @@ export default {
   settle_tx_sent: 'Transaction sent!',
   settle_tx_hash: 'TX Hash',
 
-  // Transaction history
   history_title: 'Transaction History',
   history_empty: 'No transactions yet',
   history_all: 'All',
@@ -76,7 +93,6 @@ export default {
   history_sent_badge: 'Sent',
   history_received_badge: 'Received',
 
-  // Invite
   invite_title: 'Invite',
   invite_copy: 'Copy Link',
   invite_share: 'Share',
@@ -84,7 +100,6 @@ export default {
   invite_join: 'Join Group',
   invite_text: 'Join my CryptoSplit group "{name}"',
 
-  // Join group
   join_title: 'Join Group',
   join_not_found: 'Group not found or link expired',
   join_already_in: 'You are already in this group',
@@ -93,12 +108,10 @@ export default {
   join_nickname_placeholder: 'Enter your nickname (optional)',
   join_confirm: 'Join',
 
-  // Notifications
   notif_title: 'Pending Payments',
   notif_empty: 'No pending payments',
   notif_owes_you: 'owes you',
 
-  // Cloud sync
   sync_title: 'Cloud Sync',
   sync_error: 'Sync failed, please try again later',
 

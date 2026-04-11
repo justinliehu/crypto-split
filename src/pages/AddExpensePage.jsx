@@ -47,7 +47,10 @@ export default function AddExpensePage() {
 
   if (!group) return null;
 
-  const memberLabel = (m) => m.nickname || shortAddress(m.address);
+  const memberLabel = (m) => {
+    if (m.address.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
+    return m.nickname || shortAddress(m.address);
+  };
 
   return (
     <div>
@@ -110,7 +113,7 @@ export default function AddExpensePage() {
           >
             {group.members.map((m) => (
               <option key={m.address} value={m.address}>
-                {memberLabel(m)} {m.address.toLowerCase() === address?.toLowerCase() ? t('group_you') : ''}
+                {memberLabel(m)}
               </option>
             ))}
           </select>

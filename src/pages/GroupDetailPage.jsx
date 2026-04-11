@@ -3,19 +3,41 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, getExpenses, deleteExpense, calculateBalances } from '../utils/storage';
+import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
 import QRInvite from '../components/QRInvite';
+
+const COLORS = ['bg-primary', 'bg-secondary', 'bg-accent', 'bg-info', 'bg-success', 'bg-warning', 'bg-error'];
+
+function Avatar({ name, size = 'w-8 h-8', textSize = 'text-xs' }) {
+  const initial = (name || '?')[0].toUpperCase();
+  const colorIdx = name ? name.charCodeAt(0) % COLORS.length : 0;
+  return (
+    <div className={`${size} ${COLORS[colorIdx]} rounded-full flex items-center justify-center text-white font-bold ${textSize} shrink-0`}>
+      {initial}
+    </div>
+  );
+}
+
+function formatDate(ts, locale) {
+  const d = new Date(ts);
+  if (locale === 'zh') {
+    return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
 
 export default function GroupDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const { address } = useWallet();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState({});
+  const [debts, setDebts] = useState([]);
   const [showInvite, setShowInvite] = useState(false);
+  const [activeTab, setActiveTab] = useState('expenses'); // expenses | balances
 
   const reload = () => {
     const g = getGroup(id);
@@ -23,15 +45,19 @@ export default function GroupDetailPage() {
     setGroup(g);
     setExpenses(getExpenses(id));
     setBalances(calculateBalances(id));
+    setDebts(simplifyDebts(id));
   };
 
   useEffect(reload, [id]);
 
   const memberName = (addr) => {
     if (!group) return shortAddress(addr);
+    if (addr.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
     const m = group.members.find((m) => m.address.toLowerCase() === addr.toLowerCase());
     return m?.nickname || shortAddress(addr);
   };
+
+  const isYou = (addr) => addr?.toLowerCase() === address?.toLowerCase();
 
   const handleDeleteExpense = (expId) => {
     if (!confirm(t('expense_delete_confirm'))) return;
@@ -41,111 +67,218 @@ export default function GroupDetailPage() {
 
   if (!group) return null;
 
+  // 统计
+  const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+  const yourShare = expenses.reduce((sum, e) => {
+    if (e.splitAmong.some((a) => a.toLowerCase() === address?.toLowerCase())) {
+      return sum + parseFloat(e.amount || 0) / e.splitAmong.length;
+    }
+    return sum;
+  }, 0);
+  const youPaid = expenses.reduce((sum, e) => {
+    if (e.paidBy?.toLowerCase() === address?.toLowerCase()) return sum + parseFloat(e.amount || 0);
+    return sum;
+  }, 0);
+
+  // 按月份分组账单
+  const groupedExpenses = {};
+  expenses.sort((a, b) => b.createdAt - a.createdAt).forEach((exp) => {
+    const d = new Date(exp.createdAt);
+    const key = locale === 'zh'
+      ? `${d.getFullYear()}年${d.getMonth() + 1}月`
+      : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    if (!groupedExpenses[key]) groupedExpenses[key] = [];
+    groupedExpenses[key].push(exp);
+  });
+
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2">
-        <button className="btn btn-ghost btn-sm" onClick={() => nav('/groups')}>&larr; {t('back')}</button>
-      </div>
-
-      <div className="flex items-start justify-between mb-1">
-        <h2 className="text-2xl font-bold">{group.name}</h2>
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => setShowInvite(true)}
-          title={t('invite_title')}
-        >
+      {/* 头部 */}
+      <div className="flex items-center gap-2 mb-4">
+        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => nav('/groups')}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          {t('invite_title')}
+        </button>
+        <div className="flex-1">
+          <h2 className="text-xl font-bold">{group.name}</h2>
+          <div className="flex items-center gap-1 mt-0.5">
+            {group.members.map((m, i) => (
+              <span key={i} className="text-xs text-base-content/50">
+                {isYou(m.address) ? t('group_you_label') : (m.nickname || shortAddress(m.address))}
+                {i < group.members.length - 1 ? '、' : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setShowInvite(true)}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
         </button>
       </div>
-      <p className="text-sm text-base-content/60 mb-6">
-        {group.members.map((m) => m.nickname || shortAddress(m.address)).join(', ')}
-      </p>
 
-      {/* 余额卡片 */}
-      <div className="card bg-base-200 shadow-md mb-6">
-        <div className="card-body py-4">
-          <h3 className="card-title text-base">{t('balances_title')}</h3>
-          {Object.keys(balances).length === 0 ? (
-            <p className="text-base-content/50">{t('balances_settled')}</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {Object.entries(balances).map(([currency, net]) => (
-                <div key={currency}>
-                  <p className="text-xs font-bold text-base-content/40 mb-1">{currency}</p>
-                  {Object.entries(net).map(([addr, amount]) => {
-                    const isYou = addr.toLowerCase() === address?.toLowerCase();
-                    return (
-                      <div key={addr} className="flex justify-between text-sm">
-                        <span className={isYou ? 'font-bold' : ''}>
-                          {memberName(addr)} {isYou ? t('group_you') : ''}
-                        </span>
-                        <span className={amount >= 0 ? 'text-success' : 'text-error'}>
-                          {amount >= 0 ? '+' : ''}{amount.toFixed(6)} {currency}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+      {/* 统计摘要卡片 */}
+      <div className="card bg-gradient-to-r from-primary/10 to-secondary/10 shadow-sm mb-4">
+        <div className="card-body p-4">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-xs text-base-content/50">{t('summary_total')}</p>
+              <p className="text-sm font-bold">{totalExpenses.toFixed(4)}</p>
             </div>
-          )}
+            <div>
+              <p className="text-xs text-base-content/50">{t('summary_you_paid')}</p>
+              <p className="text-sm font-bold text-primary">{youPaid.toFixed(4)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-base-content/50">{t('summary_your_share')}</p>
+              <p className="text-sm font-bold">{yourShare.toFixed(4)}</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex gap-2 mb-6">
-        <Link to={`/group/${id}/add-expense`} className="btn btn-primary btn-sm flex-1">
-          + {t('expense_add')}
+      <div className="flex gap-2 mb-4">
+        <Link to={`/group/${id}/add-expense`} className="btn btn-primary btn-sm flex-1 gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          {t('expense_add')}
         </Link>
-        <Link to={`/group/${id}/settle`} className="btn btn-secondary btn-sm flex-1">
+        <Link to={`/group/${id}/settle`} className="btn btn-secondary btn-sm flex-1 gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
           {t('settle_title')}
         </Link>
       </div>
 
-      {/* 账单列表 */}
-      <h3 className="font-bold mb-3">{t('expenses_title')}</h3>
-      {expenses.length === 0 ? (
-        <p className="text-center py-8 text-base-content/50">{t('expenses_empty')}</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {expenses.sort((a, b) => b.createdAt - a.createdAt).map((exp) => (
-            <motion.div
-              key={exp.id}
-              className="card bg-base-200"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="card-body py-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold">{exp.description}</p>
-                    <p className="text-sm text-base-content/60">
-                      {t('expense_paid_by')}: {memberName(exp.paidBy)}
-                    </p>
-                    <p className="text-xs text-base-content/40">
-                      {t('expense_split_among')}: {exp.splitAmong.map(memberName).join(', ')}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-primary">{exp.amount} {exp.currency}</p>
-                    <p className="text-xs text-base-content/40">
-                      {new Date(exp.createdAt).toLocaleDateString()}
-                    </p>
-                    <button
-                      className="btn btn-ghost btn-xs text-error mt-1"
-                      onClick={() => handleDeleteExpense(exp.id)}
-                    >
-                      {t('delete')}
-                    </button>
-                  </div>
+      {/* Tab 切换 */}
+      <div className="tabs tabs-boxed mb-4">
+        <button className={`tab ${activeTab === 'expenses' ? 'tab-active' : ''}`} onClick={() => setActiveTab('expenses')}>
+          {t('expenses_title')} ({expenses.length})
+        </button>
+        <button className={`tab ${activeTab === 'balances' ? 'tab-active' : ''}`} onClick={() => setActiveTab('balances')}>
+          {t('balances_title')}
+        </button>
+      </div>
+
+      {/* 余额 Tab */}
+      {activeTab === 'balances' && (
+        <div className="flex flex-col gap-3">
+          {debts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-3xl mb-2">🎉</p>
+              <p className="text-base-content/50">{t('balances_settled')}</p>
+            </div>
+          ) : (
+            debts.map((debt, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-base-200 rounded-xl">
+                <Avatar name={memberName(debt.from)} />
+                <div className="flex-1">
+                  <p className="text-sm">
+                    <span className={`font-semibold ${isYou(debt.from) ? 'text-error' : ''}`}>
+                      {memberName(debt.from)}
+                    </span>
+                    {' '}{t('settle_owes')}{' '}
+                    <span className={`font-semibold ${isYou(debt.to) ? 'text-success' : ''}`}>
+                      {memberName(debt.to)}
+                    </span>
+                  </p>
                 </div>
+                <span className="font-bold text-sm">{debt.amount.toFixed(4)} {debt.currency}</span>
               </div>
-            </motion.div>
-          ))}
+            ))
+          )}
         </div>
+      )}
+
+      {/* 账单 Tab — 活动流风格 */}
+      {activeTab === 'expenses' && (
+        expenses.length === 0 ? (
+          <div className="text-center py-12">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto opacity-20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+            </svg>
+            <p className="text-base-content/50">{t('expenses_empty')}</p>
+            <p className="text-xs text-base-content/30 mt-1">{t('expenses_empty_hint')}</p>
+          </div>
+        ) : (
+          Object.entries(groupedExpenses).map(([month, exps]) => (
+            <div key={month} className="mb-4">
+              <p className="text-xs font-bold text-base-content/40 uppercase tracking-wide mb-2">{month}</p>
+              <div className="flex flex-col gap-2">
+                {exps.map((exp) => {
+                  const payerIsYou = isYou(exp.paidBy);
+                  const yourExpShare = exp.splitAmong.some((a) => a.toLowerCase() === address?.toLowerCase())
+                    ? parseFloat(exp.amount) / exp.splitAmong.length : 0;
+                  const youLent = payerIsYou ? parseFloat(exp.amount) - yourExpShare : 0;
+                  const youBorrowed = !payerIsYou ? yourExpShare : 0;
+
+                  return (
+                    <motion.div
+                      key={exp.id}
+                      className="flex items-center gap-3 p-3 bg-base-200 rounded-xl hover:bg-base-300 transition-colors"
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      {/* 日期 */}
+                      <div className="text-center w-10 shrink-0">
+                        <p className="text-xs text-base-content/40 leading-none">
+                          {new Date(exp.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'short' })}
+                        </p>
+                        <p className="text-lg font-bold leading-tight">
+                          {new Date(exp.createdAt).getDate()}
+                        </p>
+                      </div>
+
+                      {/* 图标 */}
+                      <div className="w-10 h-10 rounded-xl bg-base-300 flex items-center justify-center text-lg shrink-0">
+                        {exp.currency === 'ETH' ? '⟠' : exp.currency === 'SOL' ? '◎' : exp.currency === 'SKR' ? '🔍' : '💰'}
+                      </div>
+
+                      {/* 描述 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{exp.description}</p>
+                        <p className="text-xs text-base-content/50">
+                          {memberName(exp.paidBy)} {t('expense_paid_label')} {exp.amount} {exp.currency}
+                        </p>
+                      </div>
+
+                      {/* 你的份额 */}
+                      <div className="text-right shrink-0">
+                        {youLent > 0 ? (
+                          <>
+                            <p className="text-xs text-success">{t('expense_you_lent')}</p>
+                            <p className="text-sm font-bold text-success">{youLent.toFixed(4)}</p>
+                          </>
+                        ) : youBorrowed > 0 ? (
+                          <>
+                            <p className="text-xs text-error">{t('expense_you_borrowed')}</p>
+                            <p className="text-sm font-bold text-error">{youBorrowed.toFixed(4)}</p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-base-content/30">{t('expense_not_involved')}</p>
+                        )}
+                      </div>
+
+                      {/* 删除 */}
+                      <button
+                        className="btn btn-ghost btn-xs btn-circle opacity-30 hover:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteExpense(exp.id); }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )
       )}
 
       {showInvite && <QRInvite group={group} onClose={() => setShowInvite(false)} />}

@@ -25,12 +25,18 @@ export default {
   home_feature2_title: '智能拆分',
   home_feature2_desc: '自动计算最优还款路径',
   home_feature3_title: '链上结算',
-  home_feature3_desc: '一键发送 ETH 完成结算',
+  home_feature3_desc: '一键发送 ETH / SOL / SKR 完成结算',
   home_need_wallet: '请先连接钱包',
+
+  // 仪表盘
+  dashboard_total_balance: '净余额',
+  dashboard_you_owe: '你欠',
+  dashboard_owed_to_you: '欠你',
 
   // 群组
   groups_title: '我的群组',
-  groups_empty: '还没有群组，创建一个吧！',
+  groups_empty: '还没有群组',
+  groups_empty_hint: '点击上方按钮创建你的第一个分账群组',
   groups_create: '创建群组',
   group_name: '群组名称',
   group_name_placeholder: '例如：周末聚餐',
@@ -39,36 +45,48 @@ export default {
   group_member_address: '钱包地址',
   group_member_nickname: '昵称（可选）',
   group_you: '（你）',
+  group_you_label: '你',
   group_delete_confirm: '确定删除此群组及所有账单？',
+
+  // 统计摘要
+  summary_total: '总支出',
+  summary_you_paid: '你付了',
+  summary_your_share: '你的份额',
 
   // 账单
   expenses_title: '账单',
-  expenses_empty: '暂无账单',
+  expenses_empty: '暂无账单记录',
+  expenses_empty_hint: '添加第一笔账单来开始分账',
   expense_add: '添加账单',
   expense_desc: '描述',
-  expense_desc_placeholder: '例如：晚餐',
+  expense_desc_placeholder: '例如：晚餐、打车、门票',
   expense_amount: '金额',
   expense_amount_placeholder: '0.05',
   expense_currency: '币种',
-  expense_paid_by: '付款人',
-  expense_split_among: '分摊给',
+  expense_paid_by: '谁付的钱',
+  expense_paid_label: '支付了',
+  expense_split_among: '参与分摊的人',
   expense_select_all: '全选',
   expense_delete_confirm: '确定删除此账单？',
+  expense_you_lent: '你借出了',
+  expense_you_borrowed: '你欠了',
+  expense_not_involved: '未参与',
 
   // 余额
-  balances_title: '余额总览',
+  balances_title: '余额',
   balances_you_owe: '你欠',
   balances_owes_you: '欠你',
-  balances_settled: '已结清',
+  balances_settled: '已结清！',
   balances_net: '净余额',
 
   // 结算
-  settle_title: '智能结算',
-  settle_desc: '以下是最简化的还款方案',
+  settle_title: '结算',
+  settle_desc: '最简化的还款方案，最少转账次数',
   settle_empty: '所有账已结清！',
   settle_pay: '付款',
-  settle_from: '从',
-  settle_to: '到',
+  settle_owes: '欠',
+  settle_from: '付款方',
+  settle_to: '收款方',
   settle_amount: '金额',
   settle_send_eth: '发送 ETH',
   settle_tx_sent: '交易已发送！',
@@ -84,7 +102,7 @@ export default {
   history_received_badge: '收到',
 
   // 邀请
-  invite_title: '邀请加入',
+  invite_title: '邀请',
   invite_copy: '复制链接',
   invite_share: '分享',
   invite_copied: '链接已复制！',
