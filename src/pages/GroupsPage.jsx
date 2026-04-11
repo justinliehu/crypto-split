@@ -28,28 +28,28 @@ export default function GroupsPage() {
   const [name, setName] = useState('');
   const [members, setMembers] = useState([{ address: '', nickname: '' }]);
 
-  // 总欠款/被欠统计
-  const [totalOwe, setTotalOwe] = useState(0);
-  const [totalOwed, setTotalOwed] = useState(0);
+  // 总欠款/被欠统计（按币种）
+  const [totalsByCurrency, setTotalsByCurrency] = useState({}); // { ETH: {owe, owed}, SOL: {owe, owed} }
 
   useEffect(() => {
-    if (!address) { setGroups([]); setTotalOwe(0); setTotalOwed(0); return; }
+    if (!address) { setGroups([]); setTotalsByCurrency({}); return; }
     const allGroups = getGroups().filter((g) =>
       g.createdBy === address || g.members.some((m) => m.address?.toLowerCase() === address?.toLowerCase())
     );
     setGroups(allGroups);
 
-    // 计算总额
-    let owe = 0, owed = 0;
+    // 按币种分别计算
+    const byCur = {};
     for (const g of allGroups) {
       const debts = simplifyDebts(g.id);
       for (const d of debts) {
-        if (d.from?.toLowerCase() === address?.toLowerCase()) owe += d.amount;
-        if (d.to?.toLowerCase() === address?.toLowerCase()) owed += d.amount;
+        const cur = d.currency || 'ETH';
+        if (!byCur[cur]) byCur[cur] = { owe: 0, owed: 0 };
+        if (d.from?.toLowerCase() === address?.toLowerCase()) byCur[cur].owe += d.amount;
+        if (d.to?.toLowerCase() === address?.toLowerCase()) byCur[cur].owed += d.amount;
       }
     }
-    setTotalOwe(owe);
-    setTotalOwed(owed);
+    setTotalsByCurrency(byCur);
   }, [address]);
 
   const handleCreate = () => {
@@ -73,12 +73,14 @@ export default function GroupsPage() {
 
   const getGroupBalance = (g) => {
     const debts = simplifyDebts(g.id);
-    let youOwe = 0, owedToYou = 0;
+    const byCur = {}; // { ETH: { youOwe, owedToYou } }
     for (const d of debts) {
-      if (d.from?.toLowerCase() === address?.toLowerCase()) youOwe += d.amount;
-      if (d.to?.toLowerCase() === address?.toLowerCase()) owedToYou += d.amount;
+      const cur = d.currency || 'ETH';
+      if (!byCur[cur]) byCur[cur] = { youOwe: 0, owedToYou: 0 };
+      if (d.from?.toLowerCase() === address?.toLowerCase()) byCur[cur].youOwe += d.amount;
+      if (d.to?.toLowerCase() === address?.toLowerCase()) byCur[cur].owedToYou += d.amount;
     }
-    return { youOwe, owedToYou };
+    return byCur;
   };
 
   const getMemberDisplay = (m) => {
@@ -126,33 +128,28 @@ export default function GroupsPage() {
 
   return (
     <div>
-      {/* 总览仪表盘 — Splitwise 风格 */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="card bg-base-200 shadow-sm">
-          <div className="card-body p-3 items-center text-center">
-            <p className="text-xs text-base-content/50">{t('dashboard_total_balance')}</p>
-            <p className={`text-lg font-bold ${totalOwed - totalOwe >= 0 ? 'text-success' : 'text-error'}`}>
-              {totalOwed - totalOwe >= 0 ? '+' : ''}{(totalOwed - totalOwe).toFixed(4)}
-            </p>
-          </div>
+      {/* 总览仪表盘 — 按币种分别显示 */}
+      {Object.keys(totalsByCurrency).length > 0 && (
+        <div className="flex flex-col gap-2 mb-6">
+          {Object.entries(totalsByCurrency).map(([cur, { owe, owed }]) => {
+            const net = owed - owe;
+            return (
+              <div key={cur} className="card bg-base-200 shadow-sm">
+                <div className="card-body p-3 flex-row items-center justify-between">
+                  <span className="badge badge-outline font-mono">{cur}</span>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-error">{t('dashboard_you_owe')}: {owe > 0 ? owe.toFixed(4) : '0'}</span>
+                    <span className="text-success">{t('dashboard_owed_to_you')}: {owed > 0 ? owed.toFixed(4) : '0'}</span>
+                    <span className={`font-bold ${net >= 0 ? 'text-success' : 'text-error'}`}>
+                      {net >= 0 ? '+' : ''}{net.toFixed(4)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div className="card bg-base-200 shadow-sm">
-          <div className="card-body p-3 items-center text-center">
-            <p className="text-xs text-base-content/50">{t('dashboard_you_owe')}</p>
-            <p className="text-lg font-bold text-error">
-              {totalOwe > 0 ? `-${totalOwe.toFixed(4)}` : '0'}
-            </p>
-          </div>
-        </div>
-        <div className="card bg-base-200 shadow-sm">
-          <div className="card-body p-3 items-center text-center">
-            <p className="text-xs text-base-content/50">{t('dashboard_owed_to_you')}</p>
-            <p className="text-lg font-bold text-success">
-              {totalOwed > 0 ? `+${totalOwed.toFixed(4)}` : '0'}
-            </p>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* 标题栏 */}
       <div className="flex justify-between items-center mb-4">
@@ -263,8 +260,9 @@ export default function GroupsPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {groups.map((g) => {
-            const bal = getGroupBalance(g);
-            const netBalance = bal.owedToYou - bal.youOwe;
+            const byCur = getGroupBalance(g);
+            const currencies = Object.entries(byCur);
+            const hasBalance = currencies.some(([, v]) => Math.abs(v.owedToYou - v.youOwe) > 0.000001);
             return (
               <motion.div
                 key={g.id}
@@ -274,10 +272,7 @@ export default function GroupsPage() {
               >
                 <div className="card-body py-4 px-4">
                   <div className="flex items-center gap-3">
-                    {/* 群组头像 */}
                     <Avatar name={g.name} />
-
-                    {/* 群组信息 */}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold truncate">{g.name}</h3>
                       <div className="flex items-center gap-1 mt-0.5">
@@ -299,19 +294,21 @@ export default function GroupsPage() {
                       </div>
                     </div>
 
-                    {/* 余额 */}
                     <div className="text-right">
-                      {netBalance === 0 ? (
+                      {!hasBalance ? (
                         <span className="text-xs text-base-content/40">{t('balances_settled')}</span>
                       ) : (
-                        <>
-                          <p className={`text-sm font-bold ${netBalance > 0 ? 'text-success' : 'text-error'}`}>
-                            {netBalance > 0 ? t('dashboard_owed_to_you') : t('dashboard_you_owe')}
-                          </p>
-                          <p className={`text-xs font-mono ${netBalance > 0 ? 'text-success' : 'text-error'}`}>
-                            {Math.abs(netBalance).toFixed(4)}
-                          </p>
-                        </>
+                        <div className="flex flex-col gap-0.5">
+                          {currencies.map(([cur, v]) => {
+                            const net = v.owedToYou - v.youOwe;
+                            if (Math.abs(net) < 0.000001) return null;
+                            return (
+                              <p key={cur} className={`text-xs font-mono ${net > 0 ? 'text-success' : 'text-error'}`}>
+                                {net > 0 ? '+' : ''}{net.toFixed(4)} {cur}
+                              </p>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>

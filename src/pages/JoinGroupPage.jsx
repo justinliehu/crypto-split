@@ -1,21 +1,55 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, updateGroup } from '../utils/storage';
+import { getGroup, getGroups, updateGroup } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
+
+function parseInviteData(search) {
+  try {
+    const params = new URLSearchParams(search);
+    const raw = params.get('data');
+    if (!raw) return null;
+    return JSON.parse(decodeURIComponent(atob(raw)));
+  } catch {
+    return null;
+  }
+}
+
+function importGroupFromUrl(id, search) {
+  const data = parseInviteData(search);
+  if (!data || data.id !== id) return null;
+
+  // Save directly to localStorage with the original ID
+  const groups = JSON.parse(localStorage.getItem('cryptosplit_groups') || '[]');
+  if (groups.some((g) => g.id === id)) return getGroup(id); // already exists
+
+  const group = {
+    id,
+    name: data.name,
+    members: data.members || [],
+    createdBy: data.createdBy || '',
+    createdAt: data.createdAt || Date.now(),
+  };
+  groups.push(group);
+  localStorage.setItem('cryptosplit_groups', JSON.stringify(groups));
+  return group;
+}
 
 export default function JoinGroupPage() {
   const { id } = useParams();
+  const location = useLocation();
   const nav = useNavigate();
   const { address, isConnected } = useWallet();
   const { t } = useLocale();
   const [group, setGroup] = useState(null);
   const [nickname, setNickname] = useState('');
-  const [status, setStatus] = useState('loading'); // loading | not_found | already_in | ready | joined
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
-    const g = getGroup(id);
+    let g = getGroup(id);
+    if (!g) g = importGroupFromUrl(id, location.search);
+
     if (!g) {
       setStatus('not_found');
       return;
@@ -27,7 +61,7 @@ export default function JoinGroupPage() {
     } else {
       setStatus('ready');
     }
-  }, [id, address]);
+  }, [id, address, location.search]);
 
   const handleJoin = () => {
     if (!address || !group) return;
