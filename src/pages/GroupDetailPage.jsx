@@ -67,18 +67,18 @@ export default function GroupDetailPage() {
 
   if (!group) return null;
 
-  // 统计
-  const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-  const yourShare = expenses.reduce((sum, e) => {
+  // 按币种统计
+  const statsByCurrency = {};
+  for (const e of expenses) {
+    const cur = e.currency || 'ETH';
+    if (!statsByCurrency[cur]) statsByCurrency[cur] = { total: 0, youPaid: 0, yourShare: 0 };
+    const amt = parseFloat(e.amount || 0);
+    statsByCurrency[cur].total += amt;
+    if (e.paidBy?.toLowerCase() === address?.toLowerCase()) statsByCurrency[cur].youPaid += amt;
     if (e.splitAmong.some((a) => a?.toLowerCase() === address?.toLowerCase())) {
-      return sum + parseFloat(e.amount || 0) / e.splitAmong.length;
+      statsByCurrency[cur].yourShare += amt / e.splitAmong.length;
     }
-    return sum;
-  }, 0);
-  const youPaid = expenses.reduce((sum, e) => {
-    if (e.paidBy?.toLowerCase() === address?.toLowerCase()) return sum + parseFloat(e.amount || 0);
-    return sum;
-  }, 0);
+  }
 
   // 按月份分组账单
   const groupedExpenses = {};
@@ -118,23 +118,26 @@ export default function GroupDetailPage() {
         </button>
       </div>
 
-      {/* 统计摘要卡片 */}
+      {/* 统计摘要卡片 — 按币种分行 */}
       <div className="card bg-gradient-to-r from-primary/10 to-secondary/10 shadow-sm mb-4">
         <div className="card-body p-4">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-xs text-base-content/50">{t('summary_total')}</p>
-              <p className="text-sm font-bold">{totalExpenses.toFixed(4)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-base-content/50">{t('summary_you_paid')}</p>
-              <p className="text-sm font-bold text-primary">{youPaid.toFixed(4)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-base-content/50">{t('summary_your_share')}</p>
-              <p className="text-sm font-bold">{yourShare.toFixed(4)}</p>
-            </div>
+          <div className="grid grid-cols-4 gap-2 text-center text-xs text-base-content/50 mb-1">
+            <div></div>
+            <div>{t('summary_total')}</div>
+            <div>{t('summary_you_paid')}</div>
+            <div>{t('summary_your_share')}</div>
           </div>
+          {Object.entries(statsByCurrency).map(([cur, s]) => (
+            <div key={cur} className="grid grid-cols-4 gap-2 text-center items-center">
+              <span className="badge badge-outline badge-sm font-mono">{cur}</span>
+              <p className="text-sm font-bold">{s.total.toFixed(4)}</p>
+              <p className="text-sm font-bold text-primary">{s.youPaid.toFixed(4)}</p>
+              <p className="text-sm font-bold">{s.yourShare.toFixed(4)}</p>
+            </div>
+          ))}
+          {Object.keys(statsByCurrency).length === 0 && (
+            <p className="text-center text-sm text-base-content/40">-</p>
+          )}
         </div>
       </div>
 
