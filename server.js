@@ -22,10 +22,19 @@ const MIME = {
 };
 
 createServer((req, res) => {
-  let filePath = join(DIST, req.url === '/' ? 'index.html' : req.url.split('?')[0]);
+  const rawPath = req.url.split('?')[0];
+  let filePath = join(DIST, rawPath === '/' ? 'index.html' : rawPath);
 
+  // Only apply SPA fallback for navigation requests (HTML), not for assets
   if (!existsSync(filePath) || !filePath.startsWith(DIST)) {
-    filePath = join(DIST, 'index.html'); // SPA fallback
+    const ext = extname(rawPath);
+    if (ext && ext !== '.html') {
+      // Missing asset (JS/CSS/etc.) — return 404 so browser doesn't parse HTML as JS
+      res.writeHead(404);
+      res.end('Not Found');
+      return;
+    }
+    filePath = join(DIST, 'index.html'); // SPA fallback only for routes
   }
 
   try {
