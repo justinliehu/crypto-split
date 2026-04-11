@@ -1,13 +1,6 @@
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
-COPY . .
-RUN npm run build
-
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=build /app/dist ./dist
+COPY dist ./dist
 COPY server.js ./
 EXPOSE 8000
 CMD ["node", "server.js"]
