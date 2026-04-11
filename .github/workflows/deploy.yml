@@ -1,0 +1,72 @@
+name: Build & Deploy to Koyeb
+
+on:
+  push:
+    branches: [master]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to Koyeb
+        run: |
+          # Try to get existing service
+          EXISTING=$(curl -s -H "Authorization: Bearer ${{ secrets.KOYEB_TOKEN }}" \
+            "https://app.koyeb.com/v1/services?app_id=699f3c18-7ece-42aa-aa2f-c3bcc4b2a37c&limit=10")
+          SERVICE_ID=$(echo "$EXISTING" | jq -r '.services[]? | select(.name=="crypto-split-web") | .id // empty')
+
+          BODY='{
+            "definition": {
+              "name": "crypto-split-web",
+              "type": "WEB",
+              "routes": [{"path": "/", "port": 8000}],
+              "ports": [{"port": 8000, "protocol": "http"}],
+              "scalings": [{"min": 0, "max": 1, "scopes": ["region"]}],
+              "instance_types": [{"type": "free"}],
+              "regions": ["was"],
+              "env": [{"key": "PORT", "value": "8000"}],
+              "docker": {
+                "image": "ghcr.io/${{ github.repository }}:latest"
+              }
+            }
+          }'
+
+          if [ -n "$SERVICE_ID" ]; then
+            echo "Updating existing service $SERVICE_ID"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer ${{ secrets.KOYEB_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              "https://app.koyeb.com/v1/services/$SERVICE_ID" \
+              -d "$BODY"
+          else
+            echo "Creating new service"
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.KOYEB_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              "https://app.koyeb.com/v1/services" \
+              -d "$(echo "$BODY" | jq '. + {"app_id": "699f3c18-7ece-42aa-aa2f-c3bcc4b2a37c"}')"
+          fi
