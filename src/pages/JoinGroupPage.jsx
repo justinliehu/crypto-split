@@ -22,7 +22,7 @@ export default function JoinGroupPage() {
     }
     setGroup(g);
 
-    if (address && g.members.some((m) => m.address.toLowerCase() === address.toLowerCase())) {
+    if (address && g.members.some((m) => m.address?.toLowerCase() === address.toLowerCase())) {
       setStatus('already_in');
     } else {
       setStatus('ready');

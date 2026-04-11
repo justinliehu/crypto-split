@@ -35,7 +35,7 @@ export default function GroupsPage() {
   useEffect(() => {
     if (!address) { setGroups([]); setTotalOwe(0); setTotalOwed(0); return; }
     const allGroups = getGroups().filter((g) =>
-      g.createdBy === address || g.members.some((m) => m.address.toLowerCase() === address?.toLowerCase())
+      g.createdBy === address || g.members.some((m) => m.address?.toLowerCase() === address?.toLowerCase())
     );
     setGroups(allGroups);
 
@@ -44,8 +44,8 @@ export default function GroupsPage() {
     for (const g of allGroups) {
       const debts = simplifyDebts(g.id);
       for (const d of debts) {
-        if (d.from.toLowerCase() === address?.toLowerCase()) owe += d.amount;
-        if (d.to.toLowerCase() === address?.toLowerCase()) owed += d.amount;
+        if (d.from?.toLowerCase() === address?.toLowerCase()) owe += d.amount;
+        if (d.to?.toLowerCase() === address?.toLowerCase()) owed += d.amount;
       }
     }
     setTotalOwe(owe);
@@ -75,14 +75,14 @@ export default function GroupsPage() {
     const debts = simplifyDebts(g.id);
     let youOwe = 0, owedToYou = 0;
     for (const d of debts) {
-      if (d.from.toLowerCase() === address?.toLowerCase()) youOwe += d.amount;
-      if (d.to.toLowerCase() === address?.toLowerCase()) owedToYou += d.amount;
+      if (d.from?.toLowerCase() === address?.toLowerCase()) youOwe += d.amount;
+      if (d.to?.toLowerCase() === address?.toLowerCase()) owedToYou += d.amount;
     }
     return { youOwe, owedToYou };
   };
 
   const getMemberDisplay = (m) => {
-    if (m.address.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
+    if (m.address?.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
     return m.nickname || shortAddress(m.address);
   };
 

@@ -48,7 +48,7 @@ export default function AddExpensePage() {
   if (!group) return null;
 
   const memberLabel = (m) => {
-    if (m.address.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
+    if (m.address?.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
     return m.nickname || shortAddress(m.address);
   };
 

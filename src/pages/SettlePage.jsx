@@ -24,7 +24,7 @@ export default function SettlePage() {
 
   const memberName = (addr) => {
     if (!group) return shortAddress(addr);
-    const m = group.members.find((m) => m.address.toLowerCase() === addr.toLowerCase());
+    const m = group.members.find((m) => m.address?.toLowerCase() === addr?.toLowerCase());
     return m?.nickname || shortAddress(addr);
   };
 
@@ -79,7 +79,7 @@ export default function SettlePage() {
       ) : (
         <div className="flex flex-col gap-3">
           {debts.map((debt, i) => {
-            const isYouPaying = debt.from.toLowerCase() === address?.toLowerCase();
+            const isYouPaying = debt.from?.toLowerCase() === address?.toLowerCase();
             return (
               <div key={i} className="card bg-base-200 shadow-sm">
                 <div className="card-body py-4">

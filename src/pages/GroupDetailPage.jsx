@@ -52,8 +52,8 @@ export default function GroupDetailPage() {
 
   const memberName = (addr) => {
     if (!group) return shortAddress(addr);
-    if (addr.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
-    const m = group.members.find((m) => m.address.toLowerCase() === addr.toLowerCase());
+    if (addr?.toLowerCase() === address?.toLowerCase()) return t('group_you_label');
+    const m = group.members.find((m) => m.address?.toLowerCase() === addr?.toLowerCase());
     return m?.nickname || shortAddress(addr);
   };
 
@@ -70,7 +70,7 @@ export default function GroupDetailPage() {
   // 统计
   const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
   const yourShare = expenses.reduce((sum, e) => {
-    if (e.splitAmong.some((a) => a.toLowerCase() === address?.toLowerCase())) {
+    if (e.splitAmong.some((a) => a?.toLowerCase() === address?.toLowerCase())) {
       return sum + parseFloat(e.amount || 0) / e.splitAmong.length;
     }
     return sum;
@@ -211,7 +211,7 @@ export default function GroupDetailPage() {
               <div className="flex flex-col gap-2">
                 {exps.map((exp) => {
                   const payerIsYou = isYou(exp.paidBy);
-                  const yourExpShare = exp.splitAmong.some((a) => a.toLowerCase() === address?.toLowerCase())
+                  const yourExpShare = exp.splitAmong.some((a) => a?.toLowerCase() === address?.toLowerCase())
                     ? parseFloat(exp.amount) / exp.splitAmong.length : 0;
                   const youLent = payerIsYou ? parseFloat(exp.amount) - yourExpShare : 0;
                   const youBorrowed = !payerIsYou ? yourExpShare : 0;

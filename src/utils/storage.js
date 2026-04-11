@@ -205,10 +205,10 @@ export function getDebtsOwedToYou(walletAddress) {
   const result = [];
 
   for (const group of groups) {
-    if (!group.members.some((m) => m.address.toLowerCase() === addr)) continue;
+    if (!group.members.some((m) => m.address?.toLowerCase() === addr)) continue;
 
     const debts = simplifyDebts(group.id);
-    const owedToYou = debts.filter((d) => d.to.toLowerCase() === addr);
+    const owedToYou = debts.filter((d) => d.to?.toLowerCase() === addr);
 
     if (owedToYou.length > 0) {
       result.push({
