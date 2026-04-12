@@ -50,19 +50,39 @@ export default function GroupDetailPage() {
 
   useEffect(reload, [id]);
 
-  // Fetch latest members from server and merge with local
+  // Two-way sync: push local group to server, then pull & merge remote members
   useEffect(() => {
     let cancelled = false;
-    fetch(`${window.location.origin}/api/invite/${id}`)
+    const local = getGroup(id);
+    if (!local) return;
+
+    const apiBase = window.location.origin;
+
+    // 1. Push local data to server first
+    fetch(`${apiBase}/api/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: local.id,
+        name: local.name,
+        members: local.members,
+        createdBy: local.createdBy,
+        createdAt: local.createdAt,
+      }),
+    })
+      .then(() => {
+        // 2. Then pull latest from server and merge
+        return fetch(`${apiBase}/api/invite/${id}`);
+      })
       .then((res) => res.ok ? res.json() : null)
       .then((remote) => {
         if (cancelled || !remote || !remote.members) return;
-        const local = getGroup(id);
-        if (!local) return;
-        const localAddrs = new Set(local.members.map((m) => m.address?.toLowerCase()));
+        const current = getGroup(id);
+        if (!current) return;
+        const localAddrs = new Set(current.members.map((m) => m.address?.toLowerCase()));
         const newMembers = remote.members.filter((m) => !localAddrs.has(m.address?.toLowerCase()));
         if (newMembers.length > 0) {
-          updateGroup(id, { members: [...local.members, ...newMembers] });
+          updateGroup(id, { members: [...current.members, ...newMembers] });
           reload();
         }
       })

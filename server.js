@@ -28,6 +28,19 @@ const INVITE_TTL = 24 * 60 * 60 * 1000;
 
 function saveInvite(id, data) {
   const filePath = join(INVITES_DIR, `${id}.json`);
+  // Merge members instead of overwriting
+  const existing = loadInvite(id);
+  if (existing && existing.members && data.members) {
+    const addrSet = new Set(existing.members.map((m) => (m.address || '').toLowerCase()));
+    const merged = [...existing.members];
+    for (const m of data.members) {
+      if (!addrSet.has((m.address || '').toLowerCase())) {
+        merged.push(m);
+        addrSet.add((m.address || '').toLowerCase());
+      }
+    }
+    data = { ...data, members: merged };
+  }
   writeFileSync(filePath, JSON.stringify({ ...data, _createdAt: Date.now() }));
 }
 
