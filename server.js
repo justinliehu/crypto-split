@@ -154,6 +154,18 @@ createServer(async (req, res) => {
   // --- OPTIONS preflight ---
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // --- Debug: list all sync data ---
+  if (rawPath === '/api/debug') {
+    try {
+      const syncFiles = existsSync(SYNC_DIR) ? readdirSync(SYNC_DIR) : [];
+      const inviteFiles = existsSync(INVITES_DIR) ? readdirSync(INVITES_DIR) : [];
+      const syncData = syncFiles.map((f) => {
+        try { return JSON.parse(readFileSync(join(SYNC_DIR, f), 'utf8')); } catch { return null; }
+      }).filter(Boolean);
+      return json(res, 200, { syncCount: syncFiles.length, inviteCount: inviteFiles.length, syncData });
+    } catch (e) { return json(res, 500, { error: String(e) }); }
+  }
+
   // --- API: store invite ---
   if (rawPath === '/api/invite' && req.method === 'POST') {
     const data = await parseBody(req);

@@ -38,6 +38,7 @@ export default function GroupDetailPage() {
   const [debts, setDebts] = useState([]);
   const [showInvite, setShowInvite] = useState(false);
   const [activeTab, setActiveTab] = useState('expenses'); // expenses | balances
+  const [syncStatus, setSyncStatus] = useState('');
 
   const reload = () => {
     const g = getGroup(id);
@@ -48,48 +49,52 @@ export default function GroupDetailPage() {
     setDebts(simplifyDebts(id));
   };
 
-  useEffect(reload, [id]);
-
-  // Two-way sync: push local members+expenses to server, pull & merge remote
-  useEffect(() => {
-    let cancelled = false;
+  // Sync function: push local data, pull & merge remote
+  const doSync = async () => {
     const local = getGroup(id);
     if (!local) return;
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch(`${window.location.origin}/api/sync/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: local.name,
+          createdBy: local.createdBy,
+          members: local.members,
+          expenses: getExpenses(id),
+        }),
+      });
+      if (!res.ok) { setSyncStatus('error'); return; }
+      const remote = await res.json();
+      let changed = false;
+      // Merge members
+      const current = getGroup(id);
+      if (current && remote.members) {
+        const localAddrs = new Set(current.members.map((m) => m.address?.toLowerCase()));
+        const newMembers = remote.members.filter((m) => !localAddrs.has(m.address?.toLowerCase()));
+        if (newMembers.length > 0) {
+          updateGroup(id, { members: [...current.members, ...newMembers] });
+          changed = true;
+        }
+      }
+      // Merge expenses
+      if (remote.expenses) {
+        const added = mergeRemoteExpenses(remote.expenses);
+        if (added > 0) changed = true;
+      }
+      if (changed) {
+        reload();
+        setSyncStatus(`+${remote.members?.length || 0} members, +${remote.expenses?.length || 0} expenses`);
+      } else {
+        setSyncStatus('ok');
+      }
+    } catch (e) {
+      setSyncStatus('error: ' + e.message);
+    }
+  };
 
-    fetch(`${window.location.origin}/api/sync/${id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: local.name,
-        createdBy: local.createdBy,
-        members: local.members,
-        expenses: getExpenses(id),
-      }),
-    })
-      .then((res) => res.ok ? res.json() : null)
-      .then((remote) => {
-        if (cancelled || !remote) return;
-        let changed = false;
-        // Merge members
-        const current = getGroup(id);
-        if (current && remote.members) {
-          const localAddrs = new Set(current.members.map((m) => m.address?.toLowerCase()));
-          const newMembers = remote.members.filter((m) => !localAddrs.has(m.address?.toLowerCase()));
-          if (newMembers.length > 0) {
-            updateGroup(id, { members: [...current.members, ...newMembers] });
-            changed = true;
-          }
-        }
-        // Merge expenses
-        if (remote.expenses) {
-          const added = mergeRemoteExpenses(remote.expenses);
-          if (added > 0) changed = true;
-        }
-        if (changed) reload();
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [id]);
+  useEffect(() => { reload(); doSync(); }, [id]);
 
   const memberName = (addr) => {
     if (!group) return shortAddress(addr);
@@ -152,12 +157,26 @@ export default function GroupDetailPage() {
             ))}
           </div>
         </div>
+        <button
+          className={`btn btn-ghost btn-sm btn-circle ${syncStatus === 'syncing' ? 'animate-spin' : ''}`}
+          onClick={doSync}
+          title="Sync"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
         <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setShowInvite(true)}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
           </svg>
         </button>
       </div>
+      {syncStatus && syncStatus !== 'syncing' && (
+        <div className={`text-xs text-center mb-2 ${syncStatus === 'ok' ? 'text-success' : syncStatus.startsWith('error') ? 'text-error' : 'text-info'}`}>
+          {syncStatus === 'ok' ? 'Synced' : syncStatus}
+        </div>
+      )}
 
       {/* 统计摘要卡片 — 按币种分行 */}
       <div className="card bg-gradient-to-r from-primary/10 to-secondary/10 shadow-sm mb-4">
