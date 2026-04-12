@@ -100,24 +100,28 @@ export default function JoinGroupPage() {
     return () => { cancelled = true; };
   }, [id, address, location.search]);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!address || !group) return;
     const updatedMembers = [
       ...group.members,
       { address, nickname: nickname.trim() || shortAddress(address) },
     ];
-    const updated = updateGroup(id, { members: updatedMembers });
-    // Sync updated group to server so original members can see the new member
-    fetch(`${window.location.origin}/api/sync/${id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: updated.name,
-        createdBy: updated.createdBy,
-        members: updated.members,
-        expenses: [],
-      }),
-    }).catch(() => {});
+    updateGroup(id, { members: updatedMembers });
+
+    // Sync to server — use group data directly to avoid null issues
+    try {
+      await fetch(`${window.location.origin}/api/sync/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: group.name,
+          createdBy: group.createdBy || '',
+          members: updatedMembers,
+          expenses: [],
+        }),
+      });
+    } catch (_) {}
+
     setStatus('joined');
     setTimeout(() => nav(`/group/${id}`), 1500);
   };

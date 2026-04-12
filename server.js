@@ -198,6 +198,69 @@ createServer(async (req, res) => {
     }
   }
 
+  // --- Diagnostic page ---
+  if (rawPath === '/diag') {
+    res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
+    res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diag</title>
+<style>body{font-family:monospace;padding:16px;background:#111;color:#eee;font-size:14px}pre{background:#222;padding:12px;border-radius:8px;overflow-x:auto;white-space:pre-wrap}h3{color:#6366f1}.ok{color:#22c55e}.err{color:#ef4444}button{background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:6px;margin:4px;cursor:pointer;font-size:14px}</style></head><body>
+<h2>CryptoSplit Diagnostics</h2>
+<div id="log"></div>
+<button onclick="runTest()">Run Full Test</button>
+<button onclick="checkLocal()">Check LocalStorage</button>
+<button onclick="location.href='/clear'">Clear All</button>
+<script>
+var L=document.getElementById('log');
+function log(msg,cls){L.innerHTML+='<div class="'+(cls||'')+'">'+msg+'</div>';}
+function checkLocal(){
+  L.innerHTML='';
+  var g=JSON.parse(localStorage.getItem('cryptosplit_groups')||'[]');
+  log('<h3>LocalStorage Groups ('+g.length+')</h3>');
+  g.forEach(function(gr){
+    log('<pre>'+JSON.stringify(gr,null,2)+'</pre>');
+  });
+  var e=JSON.parse(localStorage.getItem('cryptosplit_expenses')||'[]');
+  log('<h3>Expenses ('+e.length+')</h3>');
+  if(e.length>0)log('<pre>'+JSON.stringify(e,null,2)+'</pre>');
+  log('<h3>Service Workers</h3>');
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(function(r){
+      log(r.length===0?'<span class="ok">None (good)</span>':'<span class="err">'+r.length+' registered!</span>');
+    });
+  }else{log('Not supported');}
+  log('<h3>JS Version</h3>');
+  var scripts=document.querySelectorAll('script[src]');
+  log('Diag page (no app JS loaded)');
+  fetch('/').then(r=>r.text()).then(function(html){
+    var m=html.match(/index-[^"]+\\.js/);
+    log('Server serves: '+(m?m[0]:'unknown'));
+  });
+}
+async function runTest(){
+  L.innerHTML='';
+  log('<h3>1. Testing /api/sync POST...</h3>');
+  try{
+    var r=await fetch('/api/sync/diag-test-'+Date.now(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'DiagTest',members:[{address:'0xDIAG',nickname:'Diag'}],expenses:[]})});
+    var d=await r.json();
+    log('<span class="ok">POST OK: '+JSON.stringify(d.members)+'</span>');
+  }catch(e){log('<span class="err">POST FAILED: '+e.message+'</span>');}
+
+  log('<h3>2. Testing /api/debug...</h3>');
+  try{
+    var r2=await fetch('/api/debug');
+    var d2=await r2.json();
+    log('<span class="ok">syncCount='+d2.syncCount+', inviteCount='+d2.inviteCount+'</span>');
+    d2.syncData.forEach(function(s){
+      log('<pre>Group: '+s.name+' | Members: '+s.members.map(function(m){return m.nickname||m.address}).join(', ')+'</pre>');
+    });
+  }catch(e){log('<span class="err">DEBUG FAILED: '+e.message+'</span>');}
+
+  log('<h3>3. Checking localStorage...</h3>');
+  checkLocal();
+}
+</script></body></html>`);
+    return;
+  }
+
   // --- Cache-busting page: visiting this clears everything ---
   if (rawPath === '/clear') {
     res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
