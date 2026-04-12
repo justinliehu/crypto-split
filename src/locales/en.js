@@ -121,6 +121,10 @@ export default {
   sync_title: 'Cloud Sync',
   sync_error: 'Sync failed, please try again later',
 
+  wallet_not_detected: 'No wallet detected. Please install a wallet app or tap below to download:',
+  wallet_install_phantom: 'Install Phantom',
+  wallet_install_metamask: 'Install MetaMask',
+
   privacy_title: 'Privacy Policy',
   terms_title: 'Terms of Service',
 

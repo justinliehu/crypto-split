@@ -9,7 +9,27 @@ export default function WalletPicker({ wallets, onSelect, onClose }) {
       <div className="relative bg-base-200 rounded-2xl p-6 mx-4 max-w-sm w-full shadow-xl">
         <h3 className="font-bold text-lg mb-4">{t('connect_wallet')}</h3>
         {wallets.length === 0 ? (
-          <p className="text-base-content/60">No wallets detected. Please install MetaMask or another wallet.</p>
+          <div className="text-center py-4">
+            <p className="text-base-content/60 mb-3">{t('wallet_not_detected')}</p>
+            <div className="flex flex-col gap-2">
+              <a
+                href="https://phantom.app/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline btn-sm gap-2"
+              >
+                👻 {t('wallet_install_phantom')}
+              </a>
+              <a
+                href="https://metamask.io/download/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline btn-sm gap-2"
+              >
+                🦊 {t('wallet_install_metamask')}
+              </a>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {wallets.map((w) => (

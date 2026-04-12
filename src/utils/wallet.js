@@ -25,6 +25,10 @@ async function waitForInjection() {
   await new Promise((r) => setTimeout(r, 1200));
 }
 
+function isMobile() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export async function detectAvailableWallets() {
   await waitForInjection();
   const wallets = [];
@@ -46,6 +50,12 @@ export async function detectAvailableWallets() {
 
   if (hasWalletConnect()) {
     wallets.push({ id: 'walletconnect', name: 'WalletConnect', icon: '🔗', type: 'evm' });
+  }
+
+  // 手机端没检测到钱包时，添加 deeplink 选项
+  if (isMobile() && wallets.length === 0) {
+    wallets.push({ id: 'phantom-deeplink', name: 'Phantom', icon: '👻', type: 'solana' });
+    wallets.push({ id: 'metamask-deeplink', name: 'MetaMask', icon: '🦊', type: 'evm' });
   }
 
   return wallets;
@@ -111,12 +121,64 @@ async function connectWalletConnect() {
   return account;
 }
 
+/**
+ * Phantom deeplink 连接（手机浏览器无钱包扩展时使用）
+ * 三层 fallback: phantom:// → intent:// → https://phantom.app/ul/
+ */
+function connectPhantomDeeplink() {
+  const currentUrl = window.location.href;
+  const redirectUrl = encodeURIComponent(currentUrl);
+  const appUrl = encodeURIComponent(window.location.origin);
+
+  // Layer 1: phantom:// scheme
+  const phantomScheme = `phantom://v1/connect?app_url=${appUrl}&redirect_link=${redirectUrl}`;
+
+  // Layer 2: Android intent
+  const intentUrl = `intent://v1/connect?app_url=${appUrl}&redirect_link=${redirectUrl}#Intent;scheme=phantom;package=app.phantom;end;`;
+
+  // Layer 3: Universal link
+  const universalLink = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectUrl}`;
+
+  // Try scheme first
+  window.location.href = phantomScheme;
+
+  // If scheme didn't work (no app), try intent after 300ms
+  setTimeout(() => {
+    if (document.hidden) return; // App opened successfully
+    window.location.href = intentUrl;
+  }, 300);
+
+  // Last resort: universal link after 800ms
+  setTimeout(() => {
+    if (document.hidden) return;
+    window.open(universalLink, '_blank');
+  }, 800);
+
+  throw new Error('DEEPLINK_REDIRECT');
+}
+
+/**
+ * MetaMask deeplink 连接
+ */
+function connectMetaMaskDeeplink() {
+  const currentUrl = window.location.href.replace('https://', '').replace('http://', '');
+
+  // MetaMask deep link opens the current page inside MetaMask's browser
+  const metamaskDeeplink = `https://metamask.app.link/dapp/${currentUrl}`;
+
+  window.location.href = metamaskDeeplink;
+
+  throw new Error('DEEPLINK_REDIRECT');
+}
+
 export async function connectWalletById(walletId) {
   switch (walletId) {
-    case 'metamask':      return connectMetaMask();
-    case 'phantom':       return connectPhantom();
-    case 'solflare':      return connectSolflare();
-    case 'walletconnect': return connectWalletConnect();
+    case 'metamask':          return connectMetaMask();
+    case 'phantom':           return connectPhantom();
+    case 'solflare':          return connectSolflare();
+    case 'walletconnect':     return connectWalletConnect();
+    case 'phantom-deeplink':  return connectPhantomDeeplink();
+    case 'metamask-deeplink': return connectMetaMaskDeeplink();
     default: throw new Error(`未知钱包: ${walletId}`);
   }
 }

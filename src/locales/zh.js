@@ -134,6 +134,10 @@ export default {
   sync_title: '云同步',
   sync_error: '同步失败，请稍后重试',
 
+  wallet_not_detected: '未检测到钱包，请安装钱包 App 或点击下方下载：',
+  wallet_install_phantom: '安装 Phantom',
+  wallet_install_metamask: '安装 MetaMask',
+
   // 隐私/条款
   privacy_title: '隐私政策',
   terms_title: '服务条款',

@@ -21,6 +21,10 @@ export default function Header() {
       await connect(walletId);
       setShowPicker(false);
     } catch (err) {
+      if (err.message === 'DEEPLINK_REDIRECT') {
+        setShowPicker(false);
+        return; // 正在跳转到钱包 App
+      }
       alert(err.message);
     }
   };
