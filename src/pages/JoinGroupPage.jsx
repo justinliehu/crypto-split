@@ -8,7 +8,10 @@ import { shortAddress } from '../utils/wallet';
 // Decode compact format: id|name|createdBy|addr1:nick1,addr2:nick2
 function decodeInvite(encoded) {
   try {
-    const payload = decodeURIComponent(escape(atob(encoded)));
+    // Restore URL-safe base64: -→+ _→/ add padding
+    let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const payload = decodeURIComponent(escape(atob(b64)));
     const [id, name, createdBy, membersStr] = payload.split('|');
     const members = membersStr
       ? membersStr.split(',').map((m) => {

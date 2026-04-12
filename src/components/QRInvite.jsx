@@ -8,7 +8,9 @@ function encodeInvite(group) {
     .map((m) => `${m.address || ''}:${m.nickname || ''}`)
     .join(',');
   const payload = [group.id, group.name, group.createdBy || '', members].join('|');
-  return btoa(unescape(encodeURIComponent(payload)));
+  // URL-safe base64: replace +→- /→_ remove =
+  return btoa(unescape(encodeURIComponent(payload)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 export default function QRInvite({ group, onClose }) {
