@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useLocale } from '../contexts/LocaleContext';
 
-const APK_URL = 'https://github.com/justinliehu/crypto-split/releases/latest/download/CryptoSplit.apk';
+const APK_URL = '/CryptoSplit.apk';
 
 export default function DownloadPage() {
   const { t } = useLocale();
