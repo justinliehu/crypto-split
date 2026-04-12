@@ -10,6 +10,7 @@ import HistoryPage from './pages/HistoryPage';
 import JoinGroupPage from './pages/JoinGroupPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import DownloadPage from './pages/DownloadPage';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/join/:id" element={<JoinGroupPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
+            <Route path="/download" element={<DownloadPage />} />
           </Routes>
         </main>
         <Footer />

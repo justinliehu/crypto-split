@@ -6,6 +6,7 @@ export default function Footer() {
   return (
     <footer className="footer footer-center p-4 bg-base-200 text-base-content mt-auto">
       <div className="flex gap-4 text-sm">
+        <Link to="/download" className="link link-hover">{t('footer_download')}</Link>
         <Link to="/privacy" className="link link-hover">{t('footer_privacy')}</Link>
         <Link to="/terms" className="link link-hover">{t('footer_terms')}</Link>
         <span>&copy; {new Date().getFullYear()} CryptoSplit</span>

@@ -141,4 +141,17 @@ export default {
   // Footer
   footer_privacy: '隐私政策',
   footer_terms: '服务条款',
+  footer_download: '下载 APK',
+
+  // 下载页
+  download_title: '下载 Seeker DApp',
+  download_desc: '在你的 Android 设备上直接安装 Seeker DApp，获得最佳体验。',
+  download_apk: '下载 APK',
+  download_feature1_title: '安全可靠',
+  download_feature1_desc: '钱包身份验证，私钥始终由你掌控',
+  download_feature2_title: '极速流畅',
+  download_feature2_desc: '原生级性能，秒开加载',
+  download_feature3_title: '离线可用',
+  download_feature3_desc: '核心功能无需网络也能使用',
+  download_hint: '需要 Android 8.0 以上版本。安装时可能需要允许「安装未知来源应用」。',
 };

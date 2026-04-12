@@ -126,4 +126,16 @@ export default {
 
   footer_privacy: 'Privacy',
   footer_terms: 'Terms',
+  footer_download: 'Download APK',
+
+  download_title: 'Download Seeker DApp',
+  download_desc: 'Install the Seeker DApp directly on your Android device for the best experience.',
+  download_apk: 'Download APK',
+  download_feature1_title: 'Secure',
+  download_feature1_desc: 'Wallet-based authentication, your keys stay with you',
+  download_feature2_title: 'Fast',
+  download_feature2_desc: 'Native-like performance, instant load',
+  download_feature3_title: 'Offline Ready',
+  download_feature3_desc: 'Core features work even without internet',
+  download_hint: 'Android 8.0+ required. You may need to allow "Install from unknown sources".',
 };
