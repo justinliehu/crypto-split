@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts, updateGroup } from '../utils/storage';
+import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts, updateGroup, mergeRemoteExpenses } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
 import QRInvite from '../components/QRInvite';
 
@@ -50,41 +50,42 @@ export default function GroupDetailPage() {
 
   useEffect(reload, [id]);
 
-  // Two-way sync: push local group to server, then pull & merge remote members
+  // Two-way sync: push local members+expenses to server, pull & merge remote
   useEffect(() => {
     let cancelled = false;
     const local = getGroup(id);
     if (!local) return;
 
-    const apiBase = window.location.origin;
-
-    // 1. Push local data to server first
-    fetch(`${apiBase}/api/invite`, {
+    fetch(`${window.location.origin}/api/sync/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: local.id,
         name: local.name,
-        members: local.members,
         createdBy: local.createdBy,
-        createdAt: local.createdAt,
+        members: local.members,
+        expenses: getExpenses(id),
       }),
     })
-      .then(() => {
-        // 2. Then pull latest from server and merge
-        return fetch(`${apiBase}/api/invite/${id}`);
-      })
       .then((res) => res.ok ? res.json() : null)
       .then((remote) => {
-        if (cancelled || !remote || !remote.members) return;
+        if (cancelled || !remote) return;
+        let changed = false;
+        // Merge members
         const current = getGroup(id);
-        if (!current) return;
-        const localAddrs = new Set(current.members.map((m) => m.address?.toLowerCase()));
-        const newMembers = remote.members.filter((m) => !localAddrs.has(m.address?.toLowerCase()));
-        if (newMembers.length > 0) {
-          updateGroup(id, { members: [...current.members, ...newMembers] });
-          reload();
+        if (current && remote.members) {
+          const localAddrs = new Set(current.members.map((m) => m.address?.toLowerCase()));
+          const newMembers = remote.members.filter((m) => !localAddrs.has(m.address?.toLowerCase()));
+          if (newMembers.length > 0) {
+            updateGroup(id, { members: [...current.members, ...newMembers] });
+            changed = true;
+          }
         }
+        // Merge expenses
+        if (remote.expenses) {
+          const added = mergeRemoteExpenses(remote.expenses);
+          if (added > 0) changed = true;
+        }
+        if (changed) reload();
       })
       .catch(() => {});
     return () => { cancelled = true; };

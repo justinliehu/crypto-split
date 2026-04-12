@@ -102,6 +102,25 @@ export function deleteExpense(id) {
   write(EXPENSES_KEY, read(EXPENSES_KEY).filter((e) => e.id !== id));
 }
 
+/**
+ * 合并远程账单到本地（按 ID 去重）
+ * 返回新增的数量
+ */
+export function mergeRemoteExpenses(remoteExpenses) {
+  const local = read(EXPENSES_KEY);
+  const ids = new Set(local.map((e) => e.id));
+  let added = 0;
+  for (const e of remoteExpenses) {
+    if (e.id && !ids.has(e.id)) {
+      local.push(e);
+      ids.add(e.id);
+      added++;
+    }
+  }
+  if (added > 0) write(EXPENSES_KEY, local);
+  return added;
+}
+
 // ─── 余额计算（按币种分别计算） ──────────────────────────────────────────────
 
 /**

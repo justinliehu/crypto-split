@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, addExpense } from '../utils/storage';
+import { getGroup, getExpenses, addExpense } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
 
 export default function AddExpensePage() {
@@ -42,6 +42,20 @@ export default function AddExpensePage() {
       paidBy,
       splitAmong,
     });
+    // Sync to server so other members can see the new expense
+    const g = getGroup(id);
+    if (g) {
+      fetch(`${window.location.origin}/api/sync/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: g.name,
+          createdBy: g.createdBy,
+          members: g.members,
+          expenses: getExpenses(id),
+        }),
+      }).catch(() => {});
+    }
     nav(`/group/${id}`);
   };
 

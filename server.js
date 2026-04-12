@@ -6,7 +6,9 @@ import { dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
-const INVITES_DIR = join(__dirname, 'data', 'invites');
+const DATA_DIR = join(__dirname, 'data');
+const INVITES_DIR = join(DATA_DIR, 'invites');
+const SYNC_DIR = join(DATA_DIR, 'sync');
 const PORT = process.env.PORT || 8000;
 
 const MIME = {
@@ -22,13 +24,14 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
 };
 
-// File-based invite store, auto-expire after 24h
 mkdirSync(INVITES_DIR, { recursive: true });
-const INVITE_TTL = 24 * 60 * 60 * 1000;
+mkdirSync(SYNC_DIR, { recursive: true });
+const DATA_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+// ─── Invite helpers ──────────────────────────────────────────────────────────
 
 function saveInvite(id, data) {
   const filePath = join(INVITES_DIR, `${id}.json`);
-  // Merge members instead of overwriting
   const existing = loadInvite(id);
   if (existing && existing.members && data.members) {
     const addrSet = new Set(existing.members.map((m) => (m.address || '').toLowerCase()));
@@ -41,7 +44,7 @@ function saveInvite(id, data) {
     }
     data = { ...data, members: merged };
   }
-  writeFileSync(filePath, JSON.stringify({ ...data, _createdAt: Date.now() }));
+  writeFileSync(filePath, JSON.stringify({ ...data, _ts: Date.now() }));
 }
 
 function loadInvite(id) {
@@ -49,26 +52,77 @@ function loadInvite(id) {
   if (!existsSync(filePath)) return null;
   try {
     const inv = JSON.parse(readFileSync(filePath, 'utf8'));
-    if (Date.now() - inv._createdAt > INVITE_TTL) {
-      unlinkSync(filePath);
-      return null;
-    }
+    if (Date.now() - inv._ts > DATA_TTL) { unlinkSync(filePath); return null; }
     return inv;
   } catch { return null; }
 }
 
-function cleanExpiredInvites() {
+// ─── Group sync helpers (members + expenses) ────────────────────────────────
+
+function loadSync(groupId) {
+  const filePath = join(SYNC_DIR, `${groupId}.json`);
+  if (!existsSync(filePath)) return null;
   try {
-    for (const file of readdirSync(INVITES_DIR)) {
-      const filePath = join(INVITES_DIR, file);
-      try {
-        const inv = JSON.parse(readFileSync(filePath, 'utf8'));
-        if (Date.now() - inv._createdAt > INVITE_TTL) unlinkSync(filePath);
-      } catch { unlinkSync(filePath); }
-    }
-  } catch {}
+    const d = JSON.parse(readFileSync(filePath, 'utf8'));
+    if (Date.now() - d._ts > DATA_TTL) { unlinkSync(filePath); return null; }
+    return d;
+  } catch { return null; }
 }
-setInterval(cleanExpiredInvites, 60 * 60 * 1000);
+
+function mergeSync(groupId, incoming) {
+  const existing = loadSync(groupId) || { members: [], expenses: [] };
+
+  // Merge members by address
+  const addrSet = new Set((existing.members || []).map((m) => (m.address || '').toLowerCase()));
+  const members = [...(existing.members || [])];
+  for (const m of (incoming.members || [])) {
+    const addr = (m.address || '').toLowerCase();
+    if (addr && !addrSet.has(addr)) {
+      members.push(m);
+      addrSet.add(addr);
+    }
+  }
+
+  // Merge expenses by id
+  const expIds = new Set((existing.expenses || []).map((e) => e.id));
+  const expenses = [...(existing.expenses || [])];
+  for (const e of (incoming.expenses || [])) {
+    if (e.id && !expIds.has(e.id)) {
+      expenses.push(e);
+      expIds.add(e.id);
+    }
+  }
+
+  const merged = {
+    id: groupId,
+    name: incoming.name || existing.name || '',
+    createdBy: incoming.createdBy || existing.createdBy || '',
+    members,
+    expenses,
+    _ts: Date.now(),
+  };
+  writeFileSync(join(SYNC_DIR, `${groupId}.json`), JSON.stringify(merged));
+  return merged;
+}
+
+// ─── Cleanup ─────────────────────────────────────────────────────────────────
+
+function cleanExpired() {
+  for (const dir of [INVITES_DIR, SYNC_DIR]) {
+    try {
+      for (const file of readdirSync(dir)) {
+        const fp = join(dir, file);
+        try {
+          const d = JSON.parse(readFileSync(fp, 'utf8'));
+          if (Date.now() - d._ts > DATA_TTL) unlinkSync(fp);
+        } catch { try { unlinkSync(fp); } catch {} }
+      }
+    } catch {}
+  }
+}
+setInterval(cleanExpired, 60 * 60 * 1000);
+
+// ─── HTTP helpers ────────────────────────────────────────────────────────────
 
 function parseBody(req) {
   return new Promise((resolve) => {
@@ -86,43 +140,50 @@ function cors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+function json(res, code, data) {
+  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+// ─── Server ──────────────────────────────────────────────────────────────────
+
 createServer(async (req, res) => {
   const rawPath = req.url.split('?')[0];
   cors(res);
 
+  // --- OPTIONS preflight ---
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
   // --- API: store invite ---
   if (rawPath === '/api/invite' && req.method === 'POST') {
     const data = await parseBody(req);
-    if (!data || !data.id) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing id' }));
-      return;
-    }
+    if (!data || !data.id) return json(res, 400, { error: 'missing id' });
     saveInvite(data.id, data);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true }));
-    return;
+    return json(res, 200, { ok: true });
   }
 
   // --- API: get invite ---
   if (rawPath.startsWith('/api/invite/') && req.method === 'GET') {
     const id = rawPath.slice('/api/invite/'.length);
     const inv = loadInvite(id);
-    if (!inv) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'not found' }));
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(inv));
-    return;
+    if (!inv) return json(res, 404, { error: 'not found' });
+    return json(res, 200, inv);
   }
 
-  // --- OPTIONS preflight ---
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
+  // --- API: sync group (POST = push & merge, GET = pull) ---
+  if (rawPath.startsWith('/api/sync/')) {
+    const groupId = rawPath.slice('/api/sync/'.length);
+    if (req.method === 'POST') {
+      const data = await parseBody(req);
+      if (!data) return json(res, 400, { error: 'invalid body' });
+      const merged = mergeSync(groupId, data);
+      return json(res, 200, merged);
+    }
+    if (req.method === 'GET') {
+      const data = loadSync(groupId);
+      if (!data) return json(res, 404, { error: 'not found' });
+      return json(res, 200, data);
+    }
   }
 
   // --- Static files ---
@@ -142,7 +203,6 @@ createServer(async (req, res) => {
     const content = readFileSync(filePath);
     const ext = extname(filePath);
     const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
-    // HTML and SW files: never cache — always fetch latest
     if (ext === '.html' || filePath.endsWith('sw.js')) {
       headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
     }
