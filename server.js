@@ -186,6 +186,26 @@ createServer(async (req, res) => {
     }
   }
 
+  // --- Cache-busting page: visiting this clears everything ---
+  if (rawPath === '/clear') {
+    res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
+    res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Clearing...</title></head><body>
+<script>
+(async function(){
+  if('serviceWorker' in navigator){
+    var regs=await navigator.serviceWorker.getRegistrations();
+    for(var r of regs) await r.unregister();
+  }
+  var names=await caches.keys();
+  for(var n of names) await caches.delete(n);
+  localStorage.clear();
+  document.body.innerHTML='<h2 style="text-align:center;margin-top:40vh;font-family:sans-serif">Cache cleared! Redirecting...</h2>';
+  setTimeout(function(){location.href='/';},1500);
+})();
+</script></body></html>`);
+    return;
+  }
+
   // --- Static files ---
   let filePath = join(DIST, rawPath === '/' ? 'index.html' : rawPath);
 
@@ -203,7 +223,8 @@ createServer(async (req, res) => {
     const content = readFileSync(filePath);
     const ext = extname(filePath);
     const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
-    if (ext === '.html' || filePath.endsWith('sw.js')) {
+    // Never cache HTML, SW, or manifest
+    if (ext === '.html' || filePath.endsWith('sw.js') || ext === '.webmanifest') {
       headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
     }
     res.writeHead(200, headers);
