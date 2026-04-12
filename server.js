@@ -128,7 +128,12 @@ createServer(async (req, res) => {
   try {
     const content = readFileSync(filePath);
     const ext = extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+    // HTML and SW files: never cache — always fetch latest
+    if (ext === '.html' || filePath.endsWith('sw.js')) {
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
+    }
+    res.writeHead(200, headers);
     res.end(content);
   } catch {
     res.writeHead(404);

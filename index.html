@@ -11,17 +11,17 @@
   <body class="min-h-screen bg-base-100">
     <div id="root"></div>
     <script>
-      // 一次性清除旧 SW 缓存（v2 标记防止重复刷新）
+      // 清除所有旧 SW 缓存（一次性，v4 标记）
       (function(){
-        var V = 'cs_cache_v3';
-        if (localStorage.getItem(V)) return;
-        if (!('serviceWorker' in navigator)) return;
+        var V='cs_cache_v4';
+        if(localStorage.getItem(V))return;
+        if(!('serviceWorker' in navigator))return;
         Promise.all([
-          caches.keys().then(function(n){ n.forEach(function(k){ caches.delete(k); }); }),
-          navigator.serviceWorker.getRegistrations().then(function(r){ r.forEach(function(s){ s.unregister(); }); return r.length; })
+          caches.keys().then(function(n){return Promise.all(n.map(function(k){return caches.delete(k)}));}),
+          navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister();});return r.length;})
         ]).then(function(res){
-          localStorage.setItem(V, '1');
-          if (res[1] > 0) location.reload();
+          localStorage.setItem(V,'1');
+          if(res[1]>0)location.reload();
         });
       })();
     </script>

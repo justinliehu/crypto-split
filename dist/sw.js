@@ -1,1 +1,25 @@
-if(!self.define){let e,s={};const n=(n,i)=>(n=new URL(n+".js",i).href,s[n]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=n,e.onload=s,document.head.appendChild(e)}else e=n,importScripts(n),s()}).then(()=>{let e=s[n];if(!e)throw new Error(`Module ${n} didn’t register its module`);return e}));self.define=(i,r)=>{const l=e||("document"in self?document.currentScript.src:"")||location.href;if(s[l])return;let t={};const o=e=>n(e,l),u={module:{uri:l},exports:t,require:o};s[l]=Promise.all(i.map(e=>u[e]||o(e))).then(e=>(r(...e),t))}}define(["./workbox-8c29f6e4"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"registerSW.js",revision:"402b66900e731ca748771b6fc5e7a068"},{url:"index.html",revision:"09137855cc8e4b867db5ca7cfa66bf5f"},{url:"assets/vendor-C2d6kFfn.js",revision:null},{url:"assets/solana-D2jE2him.js",revision:null},{url:"assets/index-CW97jhGa.js",revision:null},{url:"assets/index-CQYXj0jw.js",revision:null},{url:"assets/index-Cc5Sw7JI.css",revision:null},{url:"assets/index-5AUf0H-N.js",revision:null},{url:"assets/encrypt-YW4qLqc9.js",revision:null},{url:"assets/cloudbase-BecTjXF5.js",revision:null},{url:"manifest.webmanifest",revision:"f7815208e428de807159b28fe11fd534"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html")))});
+
+self.addEventListener('install', (e) => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', (e) => {
+  self.registration.unregister()
+    .then(() => self.clients.matchAll())
+    .then((clients) => {
+      clients.forEach((client) => {
+        if (client instanceof WindowClient)
+          client.navigate(client.url);
+      });
+      return Promise.resolve();
+    })
+    .then(() => {
+      self.caches.keys().then((cacheNames) => {
+        Promise.all(
+          cacheNames.map((cacheName) => {
+            return self.caches.delete(cacheName);
+          }),
+        );
+      })
+    });
+});
+    
