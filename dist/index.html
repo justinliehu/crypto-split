@@ -17,7 +17,7 @@
     <script>
       // 一次性清除旧 SW 缓存（v2 标记防止重复刷新）
       (function(){
-        var V = 'cs_cache_v2';
+        var V = 'cs_cache_v3';
         if (localStorage.getItem(V)) return;
         if (!('serviceWorker' in navigator)) return;
         Promise.all([
