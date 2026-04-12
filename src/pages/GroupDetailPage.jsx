@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts } from '../utils/storage';
+import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts, updateGroup } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
 import QRInvite from '../components/QRInvite';
 
@@ -49,6 +49,26 @@ export default function GroupDetailPage() {
   };
 
   useEffect(reload, [id]);
+
+  // Fetch latest members from server and merge with local
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${window.location.origin}/api/invite/${id}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((remote) => {
+        if (cancelled || !remote || !remote.members) return;
+        const local = getGroup(id);
+        if (!local) return;
+        const localAddrs = new Set(local.members.map((m) => m.address?.toLowerCase()));
+        const newMembers = remote.members.filter((m) => !localAddrs.has(m.address?.toLowerCase()));
+        if (newMembers.length > 0) {
+          updateGroup(id, { members: [...local.members, ...newMembers] });
+          reload();
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [id]);
 
   const memberName = (addr) => {
     if (!group) return shortAddress(addr);
