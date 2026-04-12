@@ -107,16 +107,15 @@ export default function JoinGroupPage() {
       { address, nickname: nickname.trim() || shortAddress(address) },
     ];
     const updated = updateGroup(id, { members: updatedMembers });
-    // Sync updated group back to server so original members can see the new member
-    fetch(`${window.location.origin}/api/invite`, {
+    // Sync updated group to server so original members can see the new member
+    fetch(`${window.location.origin}/api/sync/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: updated.id,
         name: updated.name,
-        members: updated.members,
         createdBy: updated.createdBy,
-        createdAt: updated.createdAt,
+        members: updated.members,
+        expenses: [],
       }),
     }).catch(() => {});
     setStatus('joined');
