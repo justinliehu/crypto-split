@@ -20,14 +20,6 @@ export default function WalletPicker({ wallets, onSelect, onClose }) {
               >
                 👻 {t('wallet_install_phantom')}
               </a>
-              <a
-                href="https://metamask.io/download/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-outline btn-sm gap-2"
-              >
-                🦊 {t('wallet_install_metamask')}
-              </a>
             </div>
           </div>
         ) : (

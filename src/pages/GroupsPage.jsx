@@ -43,7 +43,7 @@ export default function GroupsPage() {
     for (const g of allGroups) {
       const debts = simplifyDebts(g.id);
       for (const d of debts) {
-        const cur = d.currency || 'ETH';
+        const cur = d.currency || 'SOL';
         if (!byCur[cur]) byCur[cur] = { owe: 0, owed: 0 };
         if (d.from?.toLowerCase() === address?.toLowerCase()) byCur[cur].owe += d.amount;
         if (d.to?.toLowerCase() === address?.toLowerCase()) byCur[cur].owed += d.amount;
@@ -75,7 +75,7 @@ export default function GroupsPage() {
     const debts = simplifyDebts(g.id);
     const byCur = {}; // { ETH: { youOwe, owedToYou } }
     for (const d of debts) {
-      const cur = d.currency || 'ETH';
+      const cur = d.currency || 'SOL';
       if (!byCur[cur]) byCur[cur] = { youOwe: 0, owedToYou: 0 };
       if (d.from?.toLowerCase() === address?.toLowerCase()) byCur[cur].youOwe += d.amount;
       if (d.to?.toLowerCase() === address?.toLowerCase()) byCur[cur].owedToYou += d.amount;

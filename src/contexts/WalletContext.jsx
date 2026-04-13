@@ -29,16 +29,6 @@ export function WalletProvider({ children }) {
     })();
   }, []);
 
-  // 监听账户变化
-  useEffect(() => {
-    if (!window.ethereum) return;
-    const handler = (accounts) => {
-      if (accounts.length > 0) setAddress(accounts[0]);
-      else { setAddress(null); setWalletId(null); }
-    };
-    window.ethereum.on('accountsChanged', handler);
-    return () => window.ethereum.removeListener('accountsChanged', handler);
-  }, []);
 
   const connect = useCallback(async (id) => {
     const addr = await connectWalletById(id);

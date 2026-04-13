@@ -88,7 +88,7 @@ export function addExpense({ groupId, description, amount, currency, paidBy, spl
     groupId,
     description,
     amount,       // 字符串，如 "0.05"
-    currency: currency || 'ETH',
+    currency: currency || 'SOL',
     paidBy,       // 付款人地址
     splitAmong,   // 参与分摊的地址数组
     createdAt: Date.now(),
@@ -129,10 +129,10 @@ export function mergeRemoteExpenses(remoteExpenses) {
  */
 export function calculateBalances(groupId) {
   const expenses = getExpenses(groupId);
-  const byCurrency = {}; // { ETH: { addr: net }, SOL: { addr: net }, ... }
+  const byCurrency = {}; // { SOL: { addr: net }, SKR: { addr: net }, ... }
 
   for (const exp of expenses) {
-    const cur = exp.currency || 'ETH';
+    const cur = exp.currency || 'SOL';
     if (!byCurrency[cur]) byCurrency[cur] = {};
     const net = byCurrency[cur];
 

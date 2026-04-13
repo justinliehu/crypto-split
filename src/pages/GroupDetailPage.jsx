@@ -104,7 +104,7 @@ export default function GroupDetailPage() {
   // 按币种统计
   const statsByCurrency = {};
   for (const e of expenses) {
-    const cur = e.currency || 'ETH';
+    const cur = e.currency || 'SOL';
     if (!statsByCurrency[cur]) statsByCurrency[cur] = { total: 0, youPaid: 0, yourShare: 0 };
     const amt = parseFloat(e.amount || 0);
     statsByCurrency[cur].total += amt;
@@ -272,7 +272,7 @@ export default function GroupDetailPage() {
 
                       {/* 图标 */}
                       <div className="w-10 h-10 rounded-xl bg-base-300 flex items-center justify-center text-lg shrink-0">
-                        {exp.currency === 'ETH' ? '⟠' : exp.currency === 'SOL' ? '◎' : exp.currency === 'SKR' ? '🔍' : '💰'}
+                        {exp.currency === 'SOL' ? '◎' : exp.currency === 'SKR' ? '🔍' : '💰'}
                       </div>
 
                       {/* 描述 */}

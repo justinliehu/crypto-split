@@ -14,7 +14,7 @@ export default function AddExpensePage() {
 
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('ETH');
+  const [currency, setCurrency] = useState('SOL');
   const [paidBy, setPaidBy] = useState('');
   const [splitAmong, setSplitAmong] = useState([]);
 
@@ -106,13 +106,8 @@ export default function AddExpensePage() {
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
             >
-              <option value="ETH">ETH</option>
               <option value="SOL">SOL</option>
               <option value="SKR">SKR (Seeker)</option>
-              <option value="MATIC">MATIC</option>
-              <option value="BNB">BNB</option>
-              <option value="USDT">USDT</option>
-              <option value="USDC">USDC</option>
             </select>
           </div>
         </div>

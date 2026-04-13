@@ -25,7 +25,7 @@ export default {
   home_feature2_title: '智能拆分',
   home_feature2_desc: '自动计算最优还款路径',
   home_feature3_title: '链上结算',
-  home_feature3_desc: '一键发送 ETH / SOL / SKR 完成结算',
+  home_feature3_desc: '一键发送 SOL / SKR 完成结算',
   home_need_wallet: '请先连接钱包',
 
   // 仪表盘
@@ -88,7 +88,7 @@ export default {
   settle_from: '付款方',
   settle_to: '收款方',
   settle_amount: '金额',
-  settle_send_eth: '发送 ETH',
+  settle_send_sol: '发送 SOL',
   settle_tx_sent: '交易已发送！',
   settle_tx_hash: '交易哈希',
 
@@ -134,9 +134,8 @@ export default {
   sync_title: '云同步',
   sync_error: '同步失败，请稍后重试',
 
-  wallet_not_detected: '未检测到钱包，请安装钱包 App 或点击下方下载：',
+  wallet_not_detected: '未检测到 Solana 钱包，请安装 Phantom 或点击下方下载：',
   wallet_install_phantom: '安装 Phantom',
-  wallet_install_metamask: '安装 MetaMask',
 
   // 隐私/条款
   privacy_title: '隐私政策',

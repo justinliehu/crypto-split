@@ -22,7 +22,7 @@ export default {
   home_feature2_title: 'Smart Splitting',
   home_feature2_desc: 'Auto-calculate optimal repayment paths',
   home_feature3_title: 'On-chain Settlement',
-  home_feature3_desc: 'One-click ETH / SOL / SKR transfer to settle debts',
+  home_feature3_desc: 'One-click SOL / SKR transfer to settle debts',
   home_need_wallet: 'Please connect your wallet first',
 
   // Dashboard
@@ -81,7 +81,7 @@ export default {
   settle_from: 'From',
   settle_to: 'To',
   settle_amount: 'Amount',
-  settle_send_eth: 'Send ETH',
+  settle_send_sol: 'Send SOL',
   settle_tx_sent: 'Transaction sent!',
   settle_tx_hash: 'TX Hash',
 
@@ -121,9 +121,8 @@ export default {
   sync_title: 'Cloud Sync',
   sync_error: 'Sync failed, please try again later',
 
-  wallet_not_detected: 'No wallet detected. Please install a wallet app or tap below to download:',
+  wallet_not_detected: 'No Solana wallet detected. Please install Phantom or tap below:',
   wallet_install_phantom: 'Install Phantom',
-  wallet_install_metamask: 'Install MetaMask',
 
   privacy_title: 'Privacy Policy',
   terms_title: 'Terms of Service',
