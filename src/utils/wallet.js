@@ -121,153 +121,35 @@ async function connectWalletConnect() {
   return account;
 }
 
-// ─── Base58 编解码 ────────────────────────────────────────────────────────────
-const _B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-function uint8ToBase58(u8) {
-  const bytes = u8 instanceof Uint8Array ? u8 : new Uint8Array(u8 || []);
-  let lead = 0;
-  while (lead < bytes.length && bytes[lead] === 0) lead++;
-  if (lead === bytes.length) return '1';
-  let big = 0n;
-  for (let i = 0; i < bytes.length; i++) big = big * 256n + BigInt(bytes[i]);
-  let out = '';
-  while (big > 0n) { out = _B58[Number(big % 58n)] + out; big /= 58n; }
-  for (let i = 0; i < lead; i++) out = '1' + out;
-  return out;
-}
-function base58ToUint8(str) {
-  let lead = 0;
-  while (lead < str.length && str[lead] === '1') lead++;
-  let big = 0n;
-  for (let i = 0; i < str.length; i++) {
-    const idx = _B58.indexOf(str[i]);
-    if (idx < 0) throw new Error('Invalid base58');
-    big = big * 58n + BigInt(idx);
-  }
-  const hex = big === 0n ? '' : big.toString(16);
-  const padded = hex.length % 2 ? '0' + hex : hex;
-  const bytes = [];
-  for (let i = 0; i < padded.length; i += 2) bytes.push(parseInt(padded.substr(i, 2), 16));
-  const result = new Uint8Array(lead + bytes.length);
-  result.set(bytes, lead);
-  return result;
-}
-
-// ─── Phantom Deeplink (X25519 加密) ──────────────────────────────────────────
-const _PDL_SK = 'cs_pdl_sk';
-const _PDL_PK = 'cs_pdl_pk';
-const _PDL_SESSION = 'cs_pdl_sess';
-
-let _naclLoaded = null;
-async function loadNacl() {
-  if (_naclLoaded) return _naclLoaded;
-  const mod = await import('tweetnacl');
-  _naclLoaded = mod.default || mod;
-  return _naclLoaded;
-}
-
-function _phantomDecrypt(dataB58, nonceB58, phantomPKb58, skB58) {
-  const nacl = _naclLoaded;
-  const plain = nacl.box.open(
-    base58ToUint8(dataB58), base58ToUint8(nonceB58),
-    base58ToUint8(phantomPKb58), base58ToUint8(skB58));
-  if (!plain) throw new Error('Phantom deeplink 解密失败');
-  return JSON.parse(new TextDecoder().decode(plain));
-}
+// ─── Wallet Deeplink（在钱包内置浏览器中打开网站）─────────────────────────────
+// 最可靠的方式：直接在钱包 App 的内置浏览器中打开当前网站，
+// 钱包会自动注入 provider，然后用正常流程连接即可。
 
 /**
- * 处理 Phantom deeplink 回调（页面加载时调用）
- * 返回 { address, walletId } 或 null
+ * Phantom deeplink — 在 Phantom 内置浏览器中打开当前页面
  */
-export async function handlePhantomDeeplinkResponse() {
-  const url = new URL(window.location.href);
-  const action = url.searchParams.get('phantom_action');
-  if (!action) return null;
+function connectPhantomDeeplink() {
+  const url = encodeURIComponent(window.location.href);
+  const browseLink = `https://phantom.app/ul/browse/${url}`;
 
-  // 清理 URL 参数
-  const cleanUrl = window.location.origin + window.location.pathname + (url.hash || '');
-  history.replaceState({}, '', cleanUrl);
+  // 先试 phantom:// scheme（直接打开 App）
+  const phantomScheme = `phantom://browse/${url}`;
 
-  const errCode = url.searchParams.get('errorCode');
-  if (errCode) {
-    console.warn('[phantom-dl] error:', errCode, url.searchParams.get('errorMessage'));
-    return null;
-  }
-
-  const nacl = await loadNacl();
-  const sk = sessionStorage.getItem(_PDL_SK);
-  if (!nacl || !sk) return null;
-
-  const nonceB58 = url.searchParams.get('nonce');
-  const dataB58 = url.searchParams.get('data');
-  if (!nonceB58 || !dataB58) return null;
-
-  try {
-    if (action === 'connect') {
-      const phantomPK = url.searchParams.get('phantom_encryption_public_key');
-      if (!phantomPK) return null;
-      const json = _phantomDecrypt(dataB58, nonceB58, phantomPK, sk);
-      sessionStorage.setItem(_PDL_SESSION, JSON.stringify({
-        publicKey: json.public_key,
-        session: json.session,
-        phantomPK,
-      }));
-      return { address: json.public_key, walletId: 'phantom-deeplink' };
-    }
-  } catch (err) {
-    console.error('[phantom-dl] handle error:', err);
-  }
-  return null;
-}
-
-/**
- * 恢复之前 deeplink 连接的 session
- */
-export function restorePhantomDeeplinkSession() {
-  const data = JSON.parse(sessionStorage.getItem(_PDL_SESSION) || 'null');
-  if (!data?.publicKey) return null;
-  return { address: data.publicKey, walletId: 'phantom-deeplink' };
-}
-
-/**
- * Phantom deeplink 连接（手机浏览器无钱包扩展时使用）
- * 使用 X25519 加密，三层 fallback: phantom:// → intent:// → universal link
- */
-async function connectPhantomDeeplink() {
-  const nacl = await loadNacl();
-  const kp = nacl.box.keyPair();
-  sessionStorage.setItem(_PDL_SK, uint8ToBase58(kp.secretKey));
-  sessionStorage.setItem(_PDL_PK, uint8ToBase58(kp.publicKey));
-
-  const redirectLink = window.location.origin + '/?phantom_action=connect';
-  const params = new URLSearchParams({
-    app_url: window.location.origin,
-    dapp_encryption_public_key: uint8ToBase58(kp.publicKey),
-    redirect_link: redirectLink,
-    cluster: 'mainnet-beta',
-  });
-
-  const deeplink = 'phantom://v1/connect?' + params.toString();
-  const universal = 'https://phantom.app/ul/v1/connect?' + params.toString();
-
-  // 三层 fallback
   let navigated = false;
-  const onBlur = () => { navigated = true; };
-  window.addEventListener('blur', onBlur, { once: true });
+  window.addEventListener('blur', () => { navigated = true; }, { once: true });
 
-  window.location.href = deeplink;
+  window.location.href = phantomScheme;
 
+  // 400ms 后如果没跳转，试 intent://
   setTimeout(() => {
-    if (navigated) return;
-    // phantom:// 没跳转，试 intent://
-    const intentUrl = 'intent://v1/connect?' + params.toString()
-      + '#Intent;scheme=phantom;package=app.phantom;'
-      + 'S.browser_fallback_url=' + encodeURIComponent(universal) + ';end';
+    if (navigated || document.hidden) return;
+    const intentUrl = `intent://browse/${url}#Intent;scheme=phantom;package=app.phantom;S.browser_fallback_url=${encodeURIComponent(browseLink)};end`;
     window.location.href = intentUrl;
 
+    // 再 500ms 后用 universal link
     setTimeout(() => {
-      if (navigated) return;
-      window.open(universal, '_blank');
+      if (navigated || document.hidden) return;
+      window.open(browseLink, '_blank');
     }, 500);
   }, 400);
 
@@ -275,8 +157,7 @@ async function connectPhantomDeeplink() {
 }
 
 /**
- * MetaMask deeplink 连接
- * 在 MetaMask 内置浏览器中打开当前页面
+ * MetaMask deeplink — 在 MetaMask 内置浏览器中打开当前页面
  */
 function connectMetaMaskDeeplink() {
   const currentUrl = window.location.href.replace(/^https?:\/\//, '');
@@ -307,9 +188,6 @@ export async function disconnectWallet(walletId) {
   if (walletId === 'solflare') {
     try { window.solflare?.disconnect(); } catch (_) {}
   }
-  if (walletId === 'phantom-deeplink') {
-    [_PDL_SK, _PDL_PK, _PDL_SESSION].forEach((k) => sessionStorage.removeItem(k));
-  }
 }
 
 export async function getConnectedAddress() {
@@ -339,10 +217,6 @@ export async function getConnectedAddress() {
       if (accounts?.[0]) return { address: accounts[0], walletId: 'walletconnect' };
     } catch (_) {}
   }
-
-  // Check deeplink session
-  const dlSession = restorePhantomDeeplinkSession();
-  if (dlSession) return dlSession;
 
   return null;
 }
