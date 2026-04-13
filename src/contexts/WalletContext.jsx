@@ -5,6 +5,7 @@ import {
   disconnectWallet,
   getConnectedAddress,
   shortAddress,
+  handlePhantomDeeplinkResponse,
 } from '../utils/wallet';
 
 const WalletContext = createContext(null);
@@ -15,9 +16,20 @@ export function WalletProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [availableWallets, setAvailableWallets] = useState([]);
 
-  // 初始化：检测已连接钱包
+  // 初始化：处理 deeplink 回调 + 检测已连接钱包
   useEffect(() => {
     (async () => {
+      // 先检查是否是 Phantom deeplink 回调
+      const dlResult = await handlePhantomDeeplinkResponse();
+      if (dlResult) {
+        setAddress(dlResult.address);
+        setWalletId(dlResult.walletId);
+        const wallets = await detectAvailableWallets();
+        setAvailableWallets(wallets);
+        setLoading(false);
+        return;
+      }
+
       const wallets = await detectAvailableWallets();
       setAvailableWallets(wallets);
       const connected = await getConnectedAddress();
