@@ -215,6 +215,6 @@ export async function sendCrypto(currency, toAddress, amount) {
     case 'SKR':
       return sendSKR(toAddress, amount);
     default:
-      throw new Error(`不支持的币种: ${currency}`);
+      return sendSOL(toAddress, amount);
   }
 }
