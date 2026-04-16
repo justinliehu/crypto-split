@@ -3,6 +3,44 @@
  * 支持：Phantom (Solana) · Solflare (Solana)
  */
 
+// ─── Solana RPC 端点（带故障转移）───────────────────────────────────────────
+// 可通过 .env 的 VITE_SOLANA_RPC 覆盖（支持逗号分隔多个）
+const DEFAULT_SOLANA_RPCS = [
+  'https://solana-rpc.publicnode.com',
+  'https://rpc.ankr.com/solana',
+  'https://solana.drpc.org',
+  'https://api.mainnet-beta.solana.com',
+];
+
+function getSolanaRpcList() {
+  const envRpc = import.meta.env.VITE_SOLANA_RPC;
+  if (envRpc) {
+    const list = envRpc.split(',').map((s) => s.trim()).filter(Boolean);
+    return [...list, ...DEFAULT_SOLANA_RPCS];
+  }
+  return DEFAULT_SOLANA_RPCS;
+}
+
+async function createResilientConnection() {
+  const { Connection } = await import('@solana/web3.js');
+  const rpcs = getSolanaRpcList();
+  let lastErr;
+  for (const rpc of rpcs) {
+    try {
+      const conn = new Connection(rpc, 'confirmed');
+      await conn.getLatestBlockhash();
+      return conn;
+    } catch (e) {
+      lastErr = e;
+      console.warn('[Solana RPC] ' + rpc + ' unavailable, trying next:', e && e.message ? e.message : e);
+    }
+  }
+  throw new Error(
+    'All Solana RPC nodes are unavailable. Set VITE_SOLANA_RPC in .env or retry later. Last error: ' +
+      (lastErr && lastErr.message ? lastErr.message : lastErr)
+  );
+}
+
 export function shortAddress(address) {
   if (!address || typeof address !== 'string') return '';
   const s = address.trim();
@@ -32,7 +70,6 @@ export async function detectAvailableWallets() {
     wallets.push({ id: 'solflare', name: 'Solflare', icon: '☀️', type: 'solana' });
   }
 
-  // 手机端没检测到钱包时，添加 deeplink 选项
   if (isMobile() && wallets.length === 0) {
     wallets.push({ id: 'phantom-deeplink', name: 'Phantom', icon: '👻', type: 'solana' });
   }
@@ -58,11 +95,6 @@ async function connectSolflare() {
   return address;
 }
 
-// ─── Wallet Deeplink（在钱包内置浏览器中打开网站）─────────────────────────────
-
-/**
- * Phantom deeplink — 在 Phantom 内置浏览器中打开当前页面
- */
 function connectPhantomDeeplink() {
   const url = encodeURIComponent(window.location.href);
   const browseLink = `https://phantom.app/ul/browse/${url}`;
@@ -122,19 +154,16 @@ export async function getConnectedAddress() {
   return null;
 }
 
-/**
- * 发送 SOL 转账
- */
 export async function sendSOL(toAddress, amountSol) {
   const provider = window.phantom?.solana ?? window.solana ?? window.solflare;
   if (!provider) throw new Error('需要 Solana 钱包（Phantom / Solflare）来发送交易');
 
   if (!provider.isConnected) await provider.connect();
 
-  const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } =
+  const { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } =
     await import('@solana/web3.js');
 
-  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  const connection = await createResilientConnection();
   const fromPubkey = provider.publicKey;
   const toPubkey = new PublicKey(toAddress);
   const lamports = Math.round(parseFloat(amountSol) * LAMPORTS_PER_SOL);
@@ -150,16 +179,13 @@ export async function sendSOL(toAddress, amountSol) {
   return signature;
 }
 
-/**
- * 发送 SPL Token 转账（用于 SKR 等 Solana 上的代币）
- */
 export async function sendSPLToken(toAddress, amount, mintAddress, decimals) {
   const provider = window.phantom?.solana ?? window.solana ?? window.solflare;
   if (!provider) throw new Error('需要 Solana 钱包来发送代币');
 
   if (!provider.isConnected) await provider.connect();
 
-  const { Connection, PublicKey, Transaction } = await import('@solana/web3.js');
+  const { PublicKey, Transaction } = await import('@solana/web3.js');
   const {
     getAssociatedTokenAddress,
     createTransferInstruction,
@@ -167,7 +193,7 @@ export async function sendSPLToken(toAddress, amount, mintAddress, decimals) {
     getAccount,
   } = await import('@solana/spl-token');
 
-  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  const connection = await createResilientConnection();
   const fromPubkey = provider.publicKey;
   const toPubkey = new PublicKey(toAddress);
   const mint = new PublicKey(mintAddress);
@@ -197,7 +223,6 @@ export async function sendSPLToken(toAddress, amount, mintAddress, decimals) {
   return signature;
 }
 
-// ─── SKR (Seeker Token) ─────────────────────────────────────────────────────
 export const SKR_MINT = 'SKRtBrVfGE3JwCrBaKBahGHLhRGyNb5G1xQNjduJkwb';
 export const SKR_DECIMALS = 9;
 
@@ -205,9 +230,6 @@ export async function sendSKR(toAddress, amount) {
   return sendSPLToken(toAddress, amount, SKR_MINT, SKR_DECIMALS);
 }
 
-/**
- * 根据币种发送对应的加密货币
- */
 export async function sendCrypto(currency, toAddress, amount) {
   switch (currency) {
     case 'SOL':
