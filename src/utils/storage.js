@@ -98,8 +98,49 @@ export function addExpense({ groupId, description, amount, currency, paidBy, spl
   return expense;
 }
 
+const DELETED_EXPENSES_KEY = 'cryptosplit_deleted_expense_ids';
+
+function readDeletedIds() {
+  try { return JSON.parse(localStorage.getItem(DELETED_EXPENSES_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function writeDeletedIds(ids) {
+  localStorage.setItem(DELETED_EXPENSES_KEY, JSON.stringify(ids));
+}
+
+export function getDeletedExpenseIds() {
+  return readDeletedIds();
+}
+
+/**
+ * 本地删除账单，并记录一个 tombstone 以便同步时传播给其他设备
+ */
 export function deleteExpense(id) {
   write(EXPENSES_KEY, read(EXPENSES_KEY).filter((e) => e.id !== id));
+  const deleted = readDeletedIds();
+  if (!deleted.includes(id)) {
+    deleted.push(id);
+    writeDeletedIds(deleted);
+  }
+}
+
+/**
+ * 把服务器返回的 deletedIds 合并到本地：删掉本地同 ID 的账单，并合并 tombstone
+ */
+export function applyRemoteDeletes(remoteDeletedIds) {
+  if (!Array.isArray(remoteDeletedIds) || remoteDeletedIds.length === 0) return 0;
+  const expenses = read(EXPENSES_KEY);
+  const remoteSet = new Set(remoteDeletedIds);
+  const filtered = expenses.filter((e) => !remoteSet.has(e.id));
+  const removed = expenses.length - filtered.length;
+  if (removed > 0) write(EXPENSES_KEY, filtered);
+
+  // 合并 tombstones
+  const local = new Set(readDeletedIds());
+  for (const id of remoteDeletedIds) local.add(id);
+  writeDeletedIds([...local]);
+  return removed;
 }
 
 /**
@@ -109,13 +150,15 @@ export function deleteExpense(id) {
 export function mergeRemoteExpenses(remoteExpenses) {
   const local = read(EXPENSES_KEY);
   const ids = new Set(local.map((e) => e.id));
+  const deleted = new Set(readDeletedIds());
   let added = 0;
   for (const e of remoteExpenses) {
-    if (e.id && !ids.has(e.id)) {
-      local.push(e);
-      ids.add(e.id);
-      added++;
-    }
+    if (!e.id) continue;
+    if (ids.has(e.id)) continue;
+    if (deleted.has(e.id)) continue; // 本地已删除，不再拉回来
+    local.push(e);
+    ids.add(e.id);
+    added++;
   }
   if (added > 0) write(EXPENSES_KEY, local);
   return added;

@@ -71,7 +71,7 @@ function loadSync(groupId) {
 }
 
 function mergeSync(groupId, incoming) {
-  const existing = loadSync(groupId) || { members: [], expenses: [] };
+  const existing = loadSync(groupId) || { members: [], expenses: [], deletedIds: [] };
 
   // Merge members by address
   const addrSet = new Set((existing.members || []).map((m) => (m.address || '').toLowerCase()));
@@ -84,15 +84,21 @@ function mergeSync(groupId, incoming) {
     }
   }
 
-  // Merge expenses by id
-  const expIds = new Set((existing.expenses || []).map((e) => e.id));
-  const expenses = [...(existing.expenses || [])];
-  for (const e of (incoming.expenses || [])) {
-    if (e.id && !expIds.has(e.id)) {
-      expenses.push(e);
-      expIds.add(e.id);
-    }
+  // Merge tombstones (deleted expense IDs) — union of local + remote, never shrinks
+  const deletedSet = new Set([
+    ...(existing.deletedIds || []),
+    ...(Array.isArray(incoming.deletedIds) ? incoming.deletedIds : []),
+  ]);
+
+  // Merge expenses by id, but exclude any that are tombstoned
+  const combined = new Map();
+  for (const e of (existing.expenses || [])) {
+    if (e.id && !deletedSet.has(e.id)) combined.set(e.id, e);
   }
+  for (const e of (incoming.expenses || [])) {
+    if (e.id && !deletedSet.has(e.id) && !combined.has(e.id)) combined.set(e.id, e);
+  }
+  const expenses = [...combined.values()];
 
   const merged = {
     id: groupId,
@@ -100,6 +106,7 @@ function mergeSync(groupId, incoming) {
     createdBy: incoming.createdBy || existing.createdBy || '',
     members,
     expenses,
+    deletedIds: [...deletedSet],
     _ts: Date.now(),
   };
   writeFileSync(join(SYNC_DIR, `${groupId}.json`), JSON.stringify(merged));

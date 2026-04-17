@@ -1,10 +1,9 @@
 /**
- * 钱包连接工具
- * 支持：Phantom (Solana) · Solflare (Solana)
+ * Wallet utility — Phantom (Solana) · Solflare (Solana)
  */
 
-// ─── Solana RPC 端点（带故障转移）───────────────────────────────────────────
-// 可通过 .env 的 VITE_SOLANA_RPC 覆盖（支持逗号分隔多个）
+// ─── Solana RPC endpoints with failover ──────────────────────────────────────
+// Override via VITE_SOLANA_RPC in .env (comma-separated list supported)
 const DEFAULT_SOLANA_RPCS = [
   'https://solana-rpc.publicnode.com',
   'https://rpc.ankr.com/solana',
@@ -45,7 +44,7 @@ export function shortAddress(address) {
   if (!address || typeof address !== 'string') return '';
   const s = address.trim();
   if (s.length <= 10) return s;
-  return s.slice(0, 6) + '…' + s.slice(-4);
+  return s.slice(0, 6) + '...' + s.slice(-4);
 }
 
 async function waitForInjection() {
@@ -63,15 +62,15 @@ export async function detectAvailableWallets() {
 
   const phantomSolana = window.phantom?.solana ?? window.solana;
   if (phantomSolana?.isPhantom) {
-    wallets.push({ id: 'phantom', name: 'Phantom', icon: '👻', type: 'solana' });
+    wallets.push({ id: 'phantom', name: 'Phantom', icon: 'P', type: 'solana' });
   }
 
   if (window.solflare?.isSolflare) {
-    wallets.push({ id: 'solflare', name: 'Solflare', icon: '☀️', type: 'solana' });
+    wallets.push({ id: 'solflare', name: 'Solflare', icon: 'S', type: 'solana' });
   }
 
   if (isMobile() && wallets.length === 0) {
-    wallets.push({ id: 'phantom-deeplink', name: 'Phantom', icon: '👻', type: 'solana' });
+    wallets.push({ id: 'phantom-deeplink', name: 'Phantom', icon: 'P', type: 'solana' });
   }
 
   return wallets;
@@ -79,26 +78,26 @@ export async function detectAvailableWallets() {
 
 async function connectPhantom() {
   const provider = window.phantom?.solana ?? window.solana;
-  if (!provider?.isPhantom) throw new Error('未检测到 Phantom 钱包，请先安装');
+  if (!provider?.isPhantom) throw new Error('Phantom not detected, please install it first');
   const resp = await provider.connect();
   const address = resp.publicKey?.toString();
-  if (!address) throw new Error('Phantom 未返回公钥');
+  if (!address) throw new Error('Phantom did not return a public key');
   return address;
 }
 
 async function connectSolflare() {
   const provider = window.solflare;
-  if (!provider?.isSolflare) throw new Error('未检测到 Solflare 钱包，请先安装');
+  if (!provider?.isSolflare) throw new Error('Solflare not detected, please install it first');
   await provider.connect();
   const address = provider.publicKey?.toString();
-  if (!address) throw new Error('Solflare 未返回公钥');
+  if (!address) throw new Error('Solflare did not return a public key');
   return address;
 }
 
 function connectPhantomDeeplink() {
   const url = encodeURIComponent(window.location.href);
-  const browseLink = `https://phantom.app/ul/browse/${url}`;
-  const phantomScheme = `phantom://browse/${url}`;
+  const browseLink = 'https://phantom.app/ul/browse/' + url;
+  const phantomScheme = 'phantom://browse/' + url;
 
   let navigated = false;
   window.addEventListener('blur', () => { navigated = true; }, { once: true });
@@ -107,7 +106,7 @@ function connectPhantomDeeplink() {
 
   setTimeout(() => {
     if (navigated || document.hidden) return;
-    const intentUrl = `intent://browse/${url}#Intent;scheme=phantom;package=app.phantom;S.browser_fallback_url=${encodeURIComponent(browseLink)};end`;
+    const intentUrl = 'intent://browse/' + url + '#Intent;scheme=phantom;package=app.phantom;S.browser_fallback_url=' + encodeURIComponent(browseLink) + ';end';
     window.location.href = intentUrl;
 
     setTimeout(() => {
@@ -124,7 +123,7 @@ export async function connectWalletById(walletId) {
     case 'phantom':           return connectPhantom();
     case 'solflare':          return connectSolflare();
     case 'phantom-deeplink':  return connectPhantomDeeplink();
-    default: throw new Error(`未知钱包: ${walletId}`);
+    default: throw new Error('Unknown wallet: ' + walletId);
   }
 }
 
@@ -137,18 +136,35 @@ export async function disconnectWallet(walletId) {
   }
 }
 
+/**
+ * On page load: detect current wallet state, and silently restore the
+ * previously authorized connection (onlyIfTrusted) so the user does not
+ * have to re-connect after every refresh.
+ */
 export async function getConnectedAddress() {
   await waitForInjection();
 
   const phantomSolana = window.phantom?.solana ?? window.solana;
-  if (phantomSolana?.isPhantom && phantomSolana.isConnected) {
-    const address = phantomSolana.publicKey?.toString();
-    if (address) return { address, walletId: 'phantom' };
+  if (phantomSolana?.isPhantom) {
+    if (phantomSolana.isConnected && phantomSolana.publicKey) {
+      return { address: phantomSolana.publicKey.toString(), walletId: 'phantom' };
+    }
+    try {
+      const resp = await phantomSolana.connect({ onlyIfTrusted: true });
+      const address = resp?.publicKey?.toString();
+      if (address) return { address, walletId: 'phantom' };
+    } catch (_) { /* not previously authorized */ }
   }
 
-  if (window.solflare?.isSolflare && window.solflare.isConnected) {
-    const address = window.solflare.publicKey?.toString();
-    if (address) return { address, walletId: 'solflare' };
+  if (window.solflare?.isSolflare) {
+    if (window.solflare.isConnected && window.solflare.publicKey) {
+      return { address: window.solflare.publicKey.toString(), walletId: 'solflare' };
+    }
+    try {
+      await window.solflare.connect({ onlyIfTrusted: true });
+      const address = window.solflare.publicKey?.toString();
+      if (address) return { address, walletId: 'solflare' };
+    } catch (_) { /* not previously authorized */ }
   }
 
   return null;
@@ -156,7 +172,7 @@ export async function getConnectedAddress() {
 
 export async function sendSOL(toAddress, amountSol) {
   const provider = window.phantom?.solana ?? window.solana ?? window.solflare;
-  if (!provider) throw new Error('需要 Solana 钱包（Phantom / Solflare）来发送交易');
+  if (!provider) throw new Error('A Solana wallet (Phantom / Solflare) is required');
 
   if (!provider.isConnected) await provider.connect();
 
@@ -181,7 +197,7 @@ export async function sendSOL(toAddress, amountSol) {
 
 export async function sendSPLToken(toAddress, amount, mintAddress, decimals) {
   const provider = window.phantom?.solana ?? window.solana ?? window.solflare;
-  if (!provider) throw new Error('需要 Solana 钱包来发送代币');
+  if (!provider) throw new Error('A Solana wallet is required');
 
   if (!provider.isConnected) await provider.connect();
 

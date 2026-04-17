@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useWallet } from '../contexts/WalletContext';
 import { useLocale } from '../contexts/LocaleContext';
-import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts, updateGroup, mergeRemoteExpenses } from '../utils/storage';
+import { getGroup, getExpenses, deleteExpense, calculateBalances, simplifyDebts, updateGroup, mergeRemoteExpenses, getDeletedExpenseIds, applyRemoteDeletes } from '../utils/storage';
 import { shortAddress } from '../utils/wallet';
 import QRInvite from '../components/QRInvite';
 
@@ -49,7 +49,7 @@ export default function GroupDetailPage() {
 
   useEffect(() => {
     reload();
-    // Auto-sync: push local data, pull & merge remote
+    // Auto-sync: push local data (with tombstones), pull & merge remote
     const local = getGroup(id);
     if (!local) return;
     fetch(`${window.location.origin}/api/sync/${id}`, {
@@ -60,6 +60,7 @@ export default function GroupDetailPage() {
         createdBy: local.createdBy,
         members: local.members,
         expenses: getExpenses(id),
+        deletedIds: getDeletedExpenseIds(),
       }),
     })
       .then((r) => r.ok ? r.json() : null)
@@ -74,6 +75,11 @@ export default function GroupDetailPage() {
             updateGroup(id, { members: [...current.members, ...newMembers] });
             changed = true;
           }
+        }
+        // 先处理远端的删除墓碑，再合并新账单
+        if (remote.deletedIds && remote.deletedIds.length > 0) {
+          const removed = applyRemoteDeletes(remote.deletedIds);
+          if (removed > 0) changed = true;
         }
         if (remote.expenses) {
           const added = mergeRemoteExpenses(remote.expenses);
@@ -97,6 +103,20 @@ export default function GroupDetailPage() {
     if (!confirm(t('expense_delete_confirm'))) return;
     deleteExpense(expId);
     reload();
+    // 把删除同步到服务器，其它设备下次打开会收到
+    const g = getGroup(id);
+    if (!g) return;
+    fetch(`${window.location.origin}/api/sync/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: g.name,
+        createdBy: g.createdBy,
+        members: g.members,
+        expenses: getExpenses(id),
+        deletedIds: getDeletedExpenseIds(),
+      }),
+    }).catch(() => {});
   };
 
   if (!group) return null;
@@ -321,4 +341,31 @@ export default function GroupDetailPage() {
       {showInvite && <QRInvite group={group} onClose={() => setShowInvite(false)} />}
     </div>
   );
+}
+/}
+                      <button
+                        className="btn btn-ghost btn-xs btn-circle opacity-30 hover:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteExpense(exp.id); }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )
+      )}
+
+      {showInvite && <QRInvite group={group} onClose={() => setShowInvite(false)} />}
+    </div>
+  );
+}
+
+    </div>
+  );
+}
 }
